@@ -1,4 +1,11 @@
 
+export interface ProductSize {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  price: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -11,12 +18,15 @@ export interface Product {
   category: string;
   isSpicy?: boolean;
   spicinessOption?: boolean;
+  hasSizes?: boolean;
+  sizes?: ProductSize[];
   tags?: string[];
 }
 
 export interface CartItem extends Product {
   quantity: number;
   selectedSpiciness?: 'Normal' | 'Spicy';
+  selectedSize?: ProductSize;
 }
 
 export interface CategoryConfig {

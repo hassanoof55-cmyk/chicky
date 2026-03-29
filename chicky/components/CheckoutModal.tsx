@@ -236,9 +236,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, subtotal
     const activeId = idToUse || orderId;
     const targetNumber = '201220062060';
     
-    const itemsList = cartItems.map(item => (
-      `- ${item.quantity}x ${item.name} (${item.selectedSpiciness || 'Original'}) = ${item.price * item.quantity} LE`
-    )).join('\n');
+    const itemsList = cartItems.map(item => {
+      const sizeLabel = item.selectedSize ? ` [${isAr ? item.selectedSize.nameAr : item.selectedSize.nameEn}]` : '';
+      const spiceLabel = item.selectedSpiciness ? ` (${isAr ? (item.selectedSpiciness === 'Spicy' ? 'حار' : 'عادي') : item.selectedSpiciness})` : '';
+      return `- ${item.quantity}x ${isAr ? item.nameAr : item.name}${sizeLabel}${spiceLabel} = ${item.price * item.quantity} LE`;
+    }).join('\n');
 
     const mapsLink = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
 

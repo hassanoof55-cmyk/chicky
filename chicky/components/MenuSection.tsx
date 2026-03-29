@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, Flame, CheckCircle, X, Star } from 'lucide-react';
+import { Plus, Flame, CheckCircle, X, Sparkles } from 'lucide-react';
 import { Product, Language, CategoryConfig, TagConfig } from '../types';
 
 interface MenuSectionProps {
@@ -14,21 +14,28 @@ interface MenuSectionProps {
 const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart, lang, tagsConfig }) => {
   const [animatingId, setAnimatingId] = useState<string | null>(null);
   const [showOptionsId, setShowOptionsId] = useState<string | null>(null);
+  const [tempSelection, setTempSelection] = useState<{ size?: any, spiciness?: any }>({});
 
   const isAr = lang === 'ar';
 
   const handleAddClick = (product: Product) => {
-    if (product.spicinessOption) {
+    if (product.hasSizes || product.spicinessOption) {
+      setTempSelection({});
       setShowOptionsId(product.id);
     } else {
       executeAdd(product);
     }
   };
 
-  const executeAdd = (product: Product, spiciness?: 'Normal' | 'Spicy') => {
-    onAddToCart(product, spiciness);
-    setAnimatingId(product.id + (spiciness || ''));
+  const executeAdd = (product: Product, spiciness?: 'Normal' | 'Spicy', size?: any) => {
+    const finalProduct = size ? { ...product, price: size.price } : product;
+    onAddToCart(finalProduct, spiciness);
+    // Add size info to cart logic handled by onAddToCart if we pass it
+    // But since CartItem extends Product, we can just pass the price-adjusted product
+    // Actually, we should store the selected size in the cart item
+    setAnimatingId(product.id + (spiciness || '') + (size?.id || ''));
     setShowOptionsId(null);
+    setTempSelection({});
     setTimeout(() => setAnimatingId(null), 800);
   };
 
@@ -53,34 +60,66 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
             
             <div className="mb-8">
               <div className="w-24 h-24 bg-red-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-red-200">
-                <Flame size={48} className="text-white animate-pulse" fill="currentColor" />
+                <Sparkles size={48} className="text-white animate-pulse" fill="currentColor" />
               </div>
               <h3 className="text-3xl font-black brand-font text-slate-900 uppercase tracking-tight">
-                {lang === 'en' ? 'PICK YOUR FIRE' : 'اختر درجة الحرارة'}
+                {lang === 'en' ? 'CUSTOMIZE' : 'تخصيص الطلب'}
               </h3>
-              <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-2">
-                {lang === 'en' ? 'Customise your crunch level' : 'خصص درجة القرمشة المفضلة لديك'}
-              </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-8">
+              {/* Size Selection */}
+              {items.find(i => i.id === showOptionsId)?.hasSizes && (
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
+                    {lang === 'en' ? 'Choose Size' : 'اختر الحجم'}
+                  </p>
+                  <div className="grid grid-cols-1 gap-3">
+                    {items.find(i => i.id === showOptionsId)?.sizes?.map(size => (
+                      <button 
+                        key={size.id}
+                        onClick={() => setTempSelection({ ...tempSelection, size })}
+                        className={`w-full py-4 rounded-2xl font-black text-sm transition-all border-2 ${tempSelection.size?.id === size.id ? 'bg-red-600 border-red-600 text-white shadow-lg' : 'bg-slate-50 border-transparent text-slate-900 hover:bg-slate-100'}`}
+                      >
+                        {lang === 'en' ? size.nameEn : size.nameAr} - {size.price} LE
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Spiciness Selection */}
+              {items.find(i => i.id === showOptionsId)?.spicinessOption && (
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
+                    {lang === 'en' ? 'Choose Heat' : 'اختر درجة الحرارة'}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => setTempSelection({ ...tempSelection, spiciness: 'Normal' })}
+                      className={`py-4 rounded-2xl font-black text-sm transition-all border-2 ${tempSelection.spiciness === 'Normal' ? 'bg-slate-900 border-slate-900 text-white shadow-lg' : 'bg-slate-100 border-transparent text-slate-900'}`}
+                    >
+                      🍗 {lang === 'en' ? 'Original' : 'عادي'}
+                    </button>
+                    <button 
+                      onClick={() => setTempSelection({ ...tempSelection, spiciness: 'Spicy' })}
+                      className={`py-4 rounded-2xl font-black text-sm transition-all border-2 ${tempSelection.spiciness === 'Spicy' ? 'bg-red-600 border-red-600 text-white shadow-lg' : 'bg-slate-100 border-transparent text-slate-900'}`}
+                    >
+                      🔥 {lang === 'en' ? 'Zinger' : 'حار'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <button 
+                disabled={(items.find(i => i.id === showOptionsId)?.hasSizes && !tempSelection.size) || (items.find(i => i.id === showOptionsId)?.spicinessOption && !tempSelection.spiciness)}
                 onClick={() => {
                   const item = items.find(i => i.id === showOptionsId);
-                  if (item) executeAdd(item, 'Normal');
+                  if (item) executeAdd(item, tempSelection.spiciness, tempSelection.size);
                 }}
-                className="w-full bg-slate-100 text-slate-900 font-black py-6 rounded-[2rem] flex items-center justify-center gap-3 hover:bg-slate-200 active:scale-95 transition-all text-xl"
+                className="w-full bg-slate-900 text-white font-black py-6 rounded-[2rem] hover:bg-red-600 active:scale-95 transition-all shadow-2xl disabled:opacity-20 mt-4 uppercase tracking-widest text-xs"
               >
-                🍗 {lang === 'en' ? 'ORIGINAL' : 'عادي'}
-              </button>
-              <button 
-                onClick={() => {
-                  const item = items.find(i => i.id === showOptionsId);
-                  if (item) executeAdd(item, 'Spicy');
-                }}
-                className="w-full bg-red-600 text-white font-black py-6 rounded-[2rem] flex items-center justify-center gap-3 hover:bg-red-700 active:scale-95 transition-all shadow-2xl shadow-red-200 text-xl"
-              >
-                🔥 {lang === 'en' ? 'ZINGER' : 'حار'}
+                {lang === 'en' ? 'ADD TO BASKET' : 'إضافة للطلب'}
               </button>
             </div>
           </div>
@@ -96,14 +135,14 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
               key={item.id} 
               className="group bg-white rounded-[2.5rem] overflow-hidden shadow-sm hover-lift border border-slate-100 flex flex-col relative"
             >
-              <div className="relative h-56 overflow-hidden">
+              <div className="relative h-56 overflow-hidden bg-white">
                 <img 
                   src={item.image} 
                   alt={lang === 'en' ? item.name : item.nameAr} 
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                  className="w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-700" 
                 />
                 
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
                   {item.tags?.map(tag => {
@@ -123,12 +162,12 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
                 </div>
 
                 <div className="absolute bottom-4 right-4 bg-slate-900/80 backdrop-blur-xl text-white px-4 py-2 rounded-2xl shadow-xl border border-white/10 flex flex-col items-end">
-                  {item.originalPrice && item.originalPrice > item.price && (
+                  {item.originalPrice && item.originalPrice > item.price && item.originalPrice > 0 ? (
                     <span className="text-[10px] text-white/50 leading-none mb-1 font-bold">
                        {isAr ? 'بدلاً من ' : 'Instead of '} 
                        <span className="line-through">{item.originalPrice}</span>
                     </span>
-                  )}
+                  ) : null}
                   <span className="text-xl font-black leading-none">
                     {item.price} <span className="text-[10px] opacity-60 uppercase">{lang === 'en' ? 'LE' : 'ج.م'}</span>
                   </span>

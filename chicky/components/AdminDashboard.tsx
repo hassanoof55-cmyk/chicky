@@ -7,9 +7,9 @@ import {
   ChevronRight, Phone, Globe, Facebook, Instagram, Upload, FileImage,
   RotateCcw, Layers, Hash, Check, Trash, Info, Key, MapPin,
   Palette, Share2, BarChart3, ListOrdered, AlignLeft, Eye, Tag as TagIcon,
-  ArrowRight, MousePointer2, Navigation, CheckCircle2, Bell
+  ArrowRight, MousePointer2, Navigation, CheckCircle2, Bell, Loader2
 } from 'lucide-react';
-import { Product, SiteConfig, Area, HeroBanner, TagConfig, CategoryConfig, OrderDetails, StoredOrder } from '../types';
+import { Product, SiteConfig, Area, HeroBanner, TagConfig, CategoryConfig, OrderDetails, StoredOrder, ProductSize } from '../types';
 import { supabase } from '../lib/supabase';
 
 declare var L: any;
@@ -420,8 +420,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                               <span className="text-2xl font-black text-slate-900">{order.totalPrice} LE</span>
                             </div>
                             <div className={`p-4 rounded-2xl flex items-center gap-3 border-2 ${order.status === 'pending' ? 'bg-orange-50 border-orange-100 text-orange-600' :
-                                order.status === 'completed' ? 'bg-green-50 border-green-100 text-green-600' :
-                                  'bg-slate-50 border-slate-100 text-slate-400'
+                              order.status === 'completed' ? 'bg-green-50 border-green-100 text-green-600' :
+                                'bg-slate-50 border-slate-100 text-slate-400'
                               }`}>
                               <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${order.status === 'pending' ? 'bg-orange-600' : order.status === 'completed' ? 'bg-green-600' : 'bg-slate-400'
                                 }`} />
@@ -519,7 +519,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                     return (
                       <div key={product.id} className="bg-white p-8 rounded-[3.5rem] border-2 border-slate-50 flex flex-col sm:flex-row items-center gap-10 group hover:border-red-600 transition-all shadow-sm relative overflow-hidden">
                         <div className="relative shrink-0">
-                          <img src={product.image} className="w-28 h-28 rounded-[2.5rem] object-cover bg-slate-100 shadow-inner ring-4 ring-slate-50" />
+                          <img src={product.image} className="w-28 h-28 rounded-[2.5rem] object-contain p-2 ring-4 ring-slate-50" />
                           {product.isSpicy && <div className="absolute -top-3 -left-3 bg-red-600 text-white p-2.5 rounded-2xl shadow-xl animate-pulse"><Flame size={18} fill="currentColor" /></div>}
                         </div>
                         <div className="flex-1 space-y-4 text-center sm:text-left">
@@ -530,9 +530,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                           <div className="flex items-center justify-center sm:justify-start gap-6">
                             <div className="flex flex-col">
                               <span className="text-2xl font-black text-red-600">{product.price} LE</span>
-                              {hasDiscount && (
+                              {hasDiscount && product.originalPrice && product.originalPrice > 0 ? (
                                 <span className="text-[10px] font-black text-slate-300 line-through uppercase">بدلاً من {product.originalPrice} LE</span>
-                              )}
+                              ) : null}
                             </div>
                             <div className="h-8 w-px bg-slate-100 hidden sm:block" />
                             <div className="text-right">
@@ -925,8 +925,72 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
               <div className="flex flex-wrap items-center gap-10 p-10 bg-slate-50 rounded-[3rem] border-4 border-white shadow-inner">
                 <label className="flex items-center gap-5 text-sm font-black uppercase cursor-pointer group"><input type="checkbox" checked={editingProduct.isSpicy} onChange={e => setEditingProduct({ ...editingProduct, isSpicy: e.target.checked })} className="w-8 h-8 rounded-xl accent-red-600" /> <span className="group-hover:text-red-600">🔥 Hot & Spicy Item</span></label>
                 <label className="flex items-center gap-5 text-sm font-black uppercase cursor-pointer group"><input type="checkbox" checked={editingProduct.spicinessOption} onChange={e => setEditingProduct({ ...editingProduct, spicinessOption: e.target.checked })} className="w-8 h-8 rounded-xl accent-red-600" /> <span className="group-hover:text-red-600">🍗 Allow Customer Choice</span></label>
+
+                {(editingProduct.category === 'sandwiches' || editingProduct.category === 'sides') && (
+                  <label className="flex items-center gap-5 text-sm font-black uppercase cursor-pointer group"><input type="checkbox" checked={editingProduct.hasSizes} onChange={e => {
+                    const checked = e.target.checked;
+                    let defaultSizes: ProductSize[] = [];
+
+                    if (checked) {
+                      if (editingProduct.category === 'sides') {
+                        defaultSizes = [
+                          { id: 'medium', nameEn: 'Medium', nameAr: 'وسط', price: editingProduct.price || 0 },
+                          { id: 'large', nameEn: 'Large', nameAr: 'كبير', price: Math.round((editingProduct.price || 0) * 1.4) }
+                        ];
+                      } else {
+                        defaultSizes = [
+                          { id: 'normal', nameEn: 'Normal', nameAr: 'نورمال', price: editingProduct.price || 0 },
+                          { id: 'duo', nameEn: 'Duo', nameAr: 'ديو', price: Math.round((editingProduct.price || 0) * 1.5) },
+                          { id: 'triple', nameEn: 'Triple', nameAr: 'تريبل', price: Math.round((editingProduct.price || 0) * 2) }
+                        ];
+                      }
+                    }
+
+                    setEditingProduct({ ...editingProduct, hasSizes: checked, sizes: checked ? defaultSizes : [] });
+                  }} className="w-8 h-8 rounded-xl accent-red-600" /> <span className="group-hover:text-red-600">📏 Multi-Size Options</span></label>
+                )}
               </div>
-              <button type="submit" className="w-full py-10 font-black uppercase text-2xl tracking-widest bg-slate-900 text-white rounded-[3rem] shadow-2xl hover:bg-red-600 transition-all flex items-center justify-center gap-6 active:scale-95"><Save size={32} /> COMMIT TO LIVE MENU</button>
+
+              {editingProduct.hasSizes && (
+                <div className="bg-slate-900 p-10 rounded-[3rem] space-y-8 animate-reveal">
+                  <div className="flex items-center gap-4 text-white">
+                    <Layers size={24} className="text-red-600" />
+                    <h4 className="text-lg font-black brand-font uppercase tracking-tight">Size Variance Pricing</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {editingProduct.sizes?.map((size, idx) => (
+                      <div key={size.id} className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] space-y-4">
+                        <div className="flex justify-between items-center text-white/50 text-[10px] font-black uppercase tracking-widest">
+                          <span>{size.nameEn}</span>
+                          <span className="font-arabic">{size.nameAr}</span>
+                        </div>
+                        <div className="relative">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 font-black text-xs">LE</div>
+                          <input
+                            type="number"
+                            className="w-full bg-white/10 border border-white/10 p-4 pl-10 rounded-2xl text-white font-black outline-none focus:border-red-600"
+                            value={size.price}
+                            onChange={e => {
+                              const newSizes = [...(editingProduct.sizes || [])];
+                              newSizes[idx].price = Number(e.target.value);
+                              setEditingProduct({ ...editingProduct, sizes: newSizes });
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest pl-2">When enabled, these prices will override the base price when selected by the customer.</p>
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-10 font-black uppercase text-2xl tracking-widest bg-slate-900 text-white rounded-[3rem] shadow-2xl hover:bg-red-600 transition-all flex items-center justify-center gap-6 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? <Loader2 className="animate-spin" size={32} /> : <Save size={32} />}
+                {loading ? 'SAVING TO CLOUD...' : 'COMMIT TO LIVE MENU'}
+              </button>
             </form>
           </div>
         )}

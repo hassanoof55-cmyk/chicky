@@ -161,6 +161,9 @@ const App: React.FC = () => {
   }, [cart, isAr]);
 
   const addToCart = (product: Product, spiciness?: 'Normal' | 'Spicy') => {
+    // Note: The product passed here may already have its price adjusted by the size selection in MenuSection
+    // We should also ensure the selected size ID is part of the identity for cart merging
+    
     // Phase 3: Add to cart animation
     const cartBtn = document.getElementById('cart-btn');
     if (cartBtn) {
@@ -169,10 +172,16 @@ const App: React.FC = () => {
     }
 
     setCart(prev => {
-      const existing = prev.find(item => item.id === product.id && item.selectedSpiciness === spiciness);
+      // Find matching item by ID AND Spiciness AND Price (which reflects Size)
+      const existing = prev.find(item => 
+        item.id === product.id && 
+        item.selectedSpiciness === spiciness && 
+        item.price === product.price
+      );
+
       if (existing) {
         return prev.map(item => 
-          (item.id === product.id && item.selectedSpiciness === spiciness) 
+          (item.id === product.id && item.selectedSpiciness === spiciness && item.price === product.price) 
           ? { ...item, quantity: item.quantity + 1 } 
           : item
         );
@@ -181,9 +190,9 @@ const App: React.FC = () => {
     });
   };
 
-  const updateQuantity = (id: string, delta: number, spiciness?: 'Normal' | 'Spicy') => {
+  const updateQuantity = (id: string, delta: number, spiciness?: 'Normal' | 'Spicy', price?: number) => {
     setCart(prev => prev.map(item => {
-      if (item.id === id && item.selectedSpiciness === spiciness) {
+      if (item.id === id && item.selectedSpiciness === spiciness && (price === undefined || item.price === price)) {
         const newQty = Math.max(1, item.quantity + delta);
         return { ...item, quantity: newQty };
       }
@@ -191,8 +200,8 @@ const App: React.FC = () => {
     }));
   };
 
-  const removeFromCart = (id: string, spiciness?: 'Normal' | 'Spicy') => {
-    setCart(prev => prev.filter(item => !(item.id === id && item.selectedSpiciness === spiciness)));
+  const removeFromCart = (id: string, spiciness?: 'Normal' | 'Spicy', price?: number) => {
+    setCart(prev => prev.filter(item => !(item.id === id && item.selectedSpiciness === spiciness && (price === undefined || item.price === price))));
   };
 
   const handleConfirmOrder = (details: OrderDetails) => {

@@ -8,33 +8,33 @@ interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   items: CartItem[];
-  onUpdateQuantity: (id: string, delta: number, spiciness?: 'Normal' | 'Spicy') => void;
-  onRemove: (id: string, spiciness?: 'Normal' | 'Spicy') => void;
+  onUpdateQuantity: (id: string, delta: number, spiciness?: 'Normal' | 'Spicy', price?: number) => void;
+  onRemove: (id: string, spiciness?: 'Normal' | 'Spicy', price?: number) => void;
   onCheckout: () => void;
   // Added lang prop to interface
   lang: Language;
 }
 
-const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdateQuantity, onRemove, onCheckout }) => {
+const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdateQuantity, onRemove, onCheckout, lang }) => {
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [lastActionId, setLastActionId] = useState<string | null>(null);
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-  const getItemKey = (item: CartItem) => `${item.id}-${item.selectedSpiciness || 'Default'}`;
+  const getItemKey = (item: CartItem) => `${item.id}-${item.selectedSpiciness || 'Default'}-${item.price}`;
 
   const handleRemove = (item: CartItem) => {
     const key = getItemKey(item);
     setRemovingKey(key);
     setTimeout(() => {
-      onRemove(item.id, item.selectedSpiciness);
+      onRemove(item.id, item.selectedSpiciness, item.price);
       setRemovingKey(null);
     }, 250); 
   };
 
   const handleQuantityUpdate = (item: CartItem, delta: number) => {
     setLastActionId(getItemKey(item) + '-' + Date.now());
-    onUpdateQuantity(item.id, delta, item.selectedSpiciness);
+    onUpdateQuantity(item.id, delta, item.selectedSpiciness, item.price);
   };
 
   if (!isOpen) return null;
@@ -98,13 +98,20 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdat
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="font-black text-gray-800 leading-tight text-sm md:text-base">{item.name}</h4>
-                        <div className="flex flex-col">
+                        <div className="flex flex-col gap-1">
                           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{item.nameAr}</p>
-                          {item.selectedSpiciness && (
-                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md mt-1 w-fit border ${item.selectedSpiciness === 'Spicy' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
-                              {item.selectedSpiciness}
-                            </span>
-                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {item.selectedSize && (
+                              <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-900 text-white border border-slate-950">
+                                {lang === 'ar' ? item.selectedSize.nameAr : item.selectedSize.nameEn}
+                              </span>
+                            )}
+                            {item.selectedSpiciness && (
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border ${item.selectedSpiciness === 'Spicy' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                                {item.selectedSpiciness}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <button 
