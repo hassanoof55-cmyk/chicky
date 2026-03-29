@@ -1,0 +1,12 @@
+/* Using Tailwind Play CDN in index.html */
+
+:root {
+  --brand-red: #E4002B;
+  --brand-dark: #0A0A0A;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #fcfcfc;
+  -webkit-tap-highlight-color: transparent;
+}

@@ -1,16 +1,15 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from './components/Navbar';
 import MenuSection from './components/MenuSection';
 import RecommendedSection from './components/RecommendedSection';
 import CartDrawer from './components/CartDrawer';
 import CheckoutModal from './components/CheckoutModal';
-import LoginModal from './components/LoginModal';
+
 import AdminDashboard from './components/AdminDashboard';
 import AdminAuthModal from './components/AdminAuthModal';
 import Footer from './components/Footer';
 import WhatsAppFloat from './components/WhatsAppFloat';
-import { getStoredMenu, saveMenuToStorage, getStoredConfig, saveConfigToStorage, subscribeToCloudChanges } from './data/menuData';
+import { getStoredMenu, saveMenuToStorage, getStoredConfig, saveConfigToStorage } from './data/menuData';
 import { Product, CartItem, Language, OrderDetails, SiteConfig } from './types';
 // Added Search to the lucide-react imports
 import { ArrowRight, Sparkles, Zap, Tag, Tag as TagIcon, X, Search } from 'lucide-react';
@@ -24,7 +23,7 @@ const App: React.FC = () => {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isAdminAuthOpen, setIsAdminAuthOpen] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
+
   const [activeCategory, setActiveCategory] = useState<string>(config.layout[0]?.id || 'cat_deals');
   const [lang, setLang] = useState<Language>('ar'); 
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,13 +32,7 @@ const App: React.FC = () => {
 
   const isAr = lang === 'ar';
 
-  useEffect(() => {
-    const unsub = subscribeToCloudChanges(
-      (newMenu) => setMenu(newMenu),
-      (newConfig) => setConfig(newConfig)
-    );
-    return () => unsub();
-  }, [config.cloudConfig?.projectId]);
+
 
   useEffect(() => {
     if (config.hero.banners.length <= 1) return;
@@ -75,8 +68,10 @@ const App: React.FC = () => {
       );
     }
     if (activeTag) {
+      const targetTag = activeTag.toLowerCase();
       result = result.filter(item => 
-        item.tags?.includes(activeTag) || (activeTag === 'Spicy' && item.isSpicy)
+        item.tags?.some(t => t.toLowerCase() === targetTag) || 
+        (targetTag === 'spicy' && item.isSpicy)
       );
     }
     return result;
@@ -166,7 +161,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`min-h-screen ${isAr ? 'font-arabic' : ''}`} dir={isAr ? 'rtl' : 'ltr'}>
-      <Navbar lang={lang} onSetLang={setLang} onOpenCart={() => setIsCartOpen(true)} onOpenLogin={() => setIsLoginOpen(true)} cartCount={cartCount} onSearchChange={setSearchQuery} logoSrc={config.header.logoRed} tags={config.tags} activeTag={activeTag} onTagToggle={handleTagToggle} filterLabelEn={config.filterLabelEn} filterLabelAr={config.filterLabelAr} />
+      <Navbar lang={lang} onSetLang={setLang} onOpenCart={() => setIsCartOpen(true)} cartCount={cartCount} onSearchChange={setSearchQuery} logoSrc={config.header.logoRed} tags={config.tags} activeTag={activeTag} onTagToggle={handleTagToggle} filterLabelEn={config.filterLabelEn} filterLabelAr={config.filterLabelAr} />
       
       {!activeTag && !searchQuery && (
         <section className="relative h-[85vh] md:h-[95vh] overflow-hidden bg-slate-950 flex items-center">
@@ -248,14 +243,18 @@ const App: React.FC = () => {
           <RecommendedSection title={recommendationTitle} items={recommendations} onAddToCart={addToCart} lang={lang} />
         )}
         
-        {!activeTag && !searchQuery && (
+        {config.layout.length > 0 && (
           <div className="sticky top-[73px] md:top-[88px] z-40 bg-white/90 glass -mx-6 px-6 py-5 md:-mx-12 md:px-12 border-b border-gray-100 mb-12 overflow-x-auto no-scrollbar shadow-sm">
             <div className="flex gap-4 min-w-max items-center">
-              {config.layout.map(cat => (
-                <button key={cat.id} onClick={() => scrollToCategory(cat.id)} className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border-2 ${activeCategory === cat.id ? 'bg-red-600 border-red-600 text-white shadow-xl scale-105' : 'bg-white border-slate-100 text-slate-500 hover:text-red-600'}`}>
-                  {isAr ? cat.nameAr : cat.nameEn}
-                </button>
-              ))}
+              {config.layout.map(cat => {
+                const hasItems = filteredMenu.some(p => p.category === cat.id);
+                if (!hasItems) return null;
+                return (
+                  <button key={cat.id} onClick={() => scrollToCategory(cat.id)} className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border-2 ${activeCategory === cat.id ? 'bg-red-600 border-red-600 text-white shadow-xl scale-105' : 'bg-white border-slate-100 text-slate-500 hover:text-red-600'}`}>
+                    {isAr ? cat.nameAr : cat.nameEn}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -263,7 +262,7 @@ const App: React.FC = () => {
         {config.layout.map((cat) => {
           const catItems = filteredMenu.filter(p => p.category === cat.id);
           if (catItems.length === 0) return null;
-          return <MenuSection key={cat.id} category={cat} items={catItems} onAddToCart={addToCart} lang={lang} />;
+          return <MenuSection key={cat.id} category={cat} items={catItems} onAddToCart={addToCart} lang={lang} tagsConfig={config.tags} />;
         })}
         
         {filteredMenu.length === 0 && (
@@ -282,7 +281,7 @@ const App: React.FC = () => {
 
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} items={cart} onUpdateQuantity={updateQuantity} onRemove={removeFromCart} onCheckout={() => { setIsCartOpen(false); setIsCheckoutOpen(true); }} lang={lang} />
       <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} subtotal={cartSubtotal} onConfirm={handleConfirmOrder} cartItems={cart} onClearCart={() => setCart([])} lang={lang} />
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} lang={lang} />
+
       <AdminAuthModal isOpen={isAdminAuthOpen} onClose={() => setIsAdminAuthOpen(false)} onAuthenticated={handleAdminAuthenticated} />
       <AdminDashboard isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} menu={menu} onUpdateMenu={updateMenu} config={config} onUpdateConfig={updateConfig} />
     </div>

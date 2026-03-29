@@ -103,12 +103,18 @@ export interface SiteConfig {
   theme: {
     primaryColor: string;
   };
-  cloudConfig?: {
-    apiKey: string;
-    authDomain: string;
-    projectId: string;
-    storageBucket: string;
-    messagingSenderId: string;
-    appId: string;
-  };
+  branchStatus?: 'open' | 'closed';
+}
+
+export interface StoredOrder {
+  id: string;
+  customerName: string;
+  phone: string;
+  address: string;
+  area: string;
+  location: { lat: number; lng: number };
+  items: CartItem[];
+  totalPrice: number;
+  status: 'pending' | 'completed' | 'cancelled';
+  createdAt: string;
 }
