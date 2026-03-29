@@ -86,22 +86,28 @@ const Footer: React.FC<FooterProps> = ({ config, lang, onOpenAdmin, scrollToCate
           </div>
         </div>
 
-        <div className="space-y-8">
-          <h4 className="text-sm font-black uppercase tracking-[0.3em] text-red-600 border-b-2 border-red-600/20 pb-4 w-fit">
-            {isAr ? 'الإدارة' : 'ADMINISTRATION'}
-          </h4>
-          <button onClick={onOpenAdmin} className="w-full flex items-center justify-between p-6 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 transition-all group border-b-4 border-b-red-600/40">
-            <div className={isAr ? 'text-right' : 'text-left'}>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block">CONTROL PANEL</span>
-              <span className="text-sm font-black uppercase tracking-widest text-white">{isAr ? 'لوحة التحكم' : 'OPEN DASHBOARD'}</span>
-            </div>
-            <Settings size={24} className="text-red-600 group-hover:rotate-180 transition-transform duration-700" />
+        <div className="flex items-end justify-end md:col-start-4">
+          <button 
+            onClick={onOpenAdmin} 
+            className="p-4 bg-transparent hover:bg-white/5 rounded-2xl transition-all group border-none outline-none focus:outline-none"
+            title={isAr ? 'لوحة التحكم' : 'Control Panel'}
+          >
+            <Settings size={22} className="text-slate-500 group-hover:text-red-600 group-hover:rotate-180 transition-transform duration-700" />
           </button>
         </div>
       </div>
       
       <div className="max-w-7xl mx-auto px-6 md:px-12 pt-12 flex flex-col md:flex-row items-center justify-between gap-6 text-[11px] font-black uppercase tracking-[0.4em] text-slate-500">
-        <p>{isAr ? config.footer.copyrightAr : config.footer.copyrightEn}</p>
+        <p>
+          <a 
+            href="https://www.facebook.com/hassan.mohamed.133068" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:text-red-500 transition-colors"
+          >
+            {isAr ? config.footer.copyrightAr : config.footer.copyrightEn}
+          </a>
+        </p>
         <div className="flex gap-8">
           <span className="hover:text-white cursor-pointer transition-colors">PRIVACY</span>
           <span className="hover:text-white cursor-pointer transition-colors">TERMS</span>

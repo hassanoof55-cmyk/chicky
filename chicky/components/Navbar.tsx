@@ -1,12 +1,11 @@
 
 import React from 'react';
-import { ShoppingCart, Menu, Search, User, Globe, Flame, Star, Zap, Leaf, Award } from 'lucide-react';
+import { ShoppingCart, Menu, Search, Globe, Flame, Star, Zap, Leaf, Award } from 'lucide-react';
 import { Language, TagConfig } from '../types';
 import Logo from './Logo';
 
 interface NavbarProps {
   onOpenCart: () => void;
-  onOpenLogin: () => void;
   cartCount: number;
   lang: Language;
   onSetLang: (lang: Language) => void;
@@ -29,7 +28,7 @@ const getTagIcon = (tagEn: string) => {
 };
 
 const Navbar: React.FC<NavbarProps> = ({ 
-  onOpenCart, onOpenLogin, cartCount, lang, onSetLang, onSearchChange, logoSrc,
+  onOpenCart, cartCount, lang, onSetLang, onSearchChange, logoSrc,
   tags, activeTag, onTagToggle, filterLabelEn, filterLabelAr
 }) => {
   return (
@@ -69,13 +68,7 @@ const Navbar: React.FC<NavbarProps> = ({
             <span>{lang === 'en' ? 'AR' : 'EN'}</span>
           </button>
           
-          <button 
-            onClick={onOpenLogin}
-            className="hidden sm:flex items-center gap-2 text-slate-800 font-black hover:text-red-600 transition-colors uppercase tracking-widest"
-          >
-            <User size={20} />
-            <span className="text-xs">{lang === 'en' ? 'Sign In' : 'دخول'}</span>
-          </button>
+
 
           <button 
             onClick={onOpenCart}

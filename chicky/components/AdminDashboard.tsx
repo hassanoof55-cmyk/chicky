@@ -4,12 +4,12 @@ import {
   X, Plus, Edit2, Trash2, Search, Layout, Database, 
   Settings2, Truck, Map as MapIcon, AppWindow,
   Sparkles, Star, Flame, Image as ImageIcon, Save,
-  ChevronRight, Phone, Globe, Facebook, Instagram, Tag, Upload, FileImage, 
-  RotateCcw, Layers, Hash, Check, Trash, Cloud, CloudOff, Info, Key, MapPin,
+  ChevronRight, Phone, Globe, Facebook, Instagram, Upload, FileImage, 
+  RotateCcw, Layers, Hash, Check, Trash, Info, Key, MapPin,
   Palette, Share2, BarChart3, ListOrdered, AlignLeft, Eye, Tag as TagIcon,
   ArrowRight, MousePointer2, Navigation, CheckCircle2
 } from 'lucide-react';
-import { Product, SiteConfig, Area, HeroBanner, TagConfig, CategoryConfig } from '../types';
+import { Product, SiteConfig, Area, HeroBanner, TagConfig, CategoryConfig, OrderDetails, StoredOrder } from '../types';
 
 declare var L: any;
 
@@ -29,8 +29,9 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, onUpdateMenu, config, onUpdateConfig }) => {
-  const [activeTab, setActiveTab] = useState<'menu' | 'builder' | 'areas' | 'cloud'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'builder' | 'areas' | 'orders'>('menu');
   const [builderSubTab, setBuilderSubTab] = useState<'branding' | 'hero' | 'categories' | 'tags' | 'social'>('branding');
+  const [orders, setOrders] = useState<StoredOrder[]>([]);
   
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -52,14 +53,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const [newArea, setNewArea] = useState<Partial<Area>>({ nameEn: '', nameAr: '', fee: 0 });
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
 
-  const [cloudSettings, setCloudSettings] = useState({
-    apiKey: config.cloudConfig?.apiKey || '',
-    authDomain: config.cloudConfig?.authDomain || '',
-    projectId: config.cloudConfig?.projectId || '',
-    storageBucket: config.cloudConfig?.storageBucket || '',
-    messagingSenderId: config.cloudConfig?.messagingSenderId || '',
-    appId: config.cloudConfig?.appId || ''
-  });
+  const [localFilterLabelEn, setLocalFilterLabelEn] = useState(config.filterLabelEn || '');
+  const [localFilterLabelAr, setLocalFilterLabelAr] = useState(config.filterLabelAr || '');
+
 
   const adminMapRef = useRef<any>(null);
   const drawingLayerRef = useRef<any>(null);
@@ -68,6 +64,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const drawingModeRef = useRef(false);
 
   useEffect(() => { drawingModeRef.current = drawingMode; }, [drawingMode]);
+
+  useEffect(() => {
+    setLocalFilterLabelEn(config.filterLabelEn || '');
+    setLocalFilterLabelAr(config.filterLabelAr || '');
+  }, [config.filterLabelEn, config.filterLabelAr]);
 
   useEffect(() => {
     if (!drawingLayerRef.current) return;
@@ -166,8 +167,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
-    if (editingProduct.id) { onUpdateMenu(menu.map(p => p.id === editingProduct.id ? editingProduct as Product : p)); } 
-    else { onUpdateMenu([...menu, { ...editingProduct, id: 'p' + Date.now() } as Product]); }
+    
+    let newMenu: Product[];
+    if (editingProduct.id) {
+       newMenu = menu.map(p => p.id === editingProduct.id ? editingProduct as Product : p);
+    } else {
+       newMenu = [...menu, { ...editingProduct, id: 'p' + Date.now() } as Product];
+    }
+    onUpdateMenu(newMenu);
     setIsProductFormOpen(false);
   };
 
@@ -175,21 +182,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
     e.preventDefault();
     if (!editingBanner) return;
     const banners = [...config.hero.banners];
-    if (editingBanner.id) { const idx = banners.findIndex(b => b.id === editingBanner.id); banners[idx] = editingBanner as HeroBanner; } 
-    else { banners.push({ ...editingBanner, id: 'b' + Date.now() } as HeroBanner); }
+    if (editingBanner.id) {
+      const idx = banners.findIndex(b => b.id === editingBanner.id);
+      banners[idx] = editingBanner as HeroBanner;
+    } else {
+      banners.push({ ...editingBanner, id: 'b' + Date.now() } as HeroBanner);
+    }
+    
     onUpdateConfig({ ...config, hero: { banners } });
     setIsBannerFormOpen(false);
   };
 
   const handleAddCategory = () => {
     if (!newCat.en.trim() || !newCat.ar.trim()) return;
-    onUpdateConfig({ ...config, layout: [...config.layout, { id: 'cat_' + Date.now(), nameEn: newCat.en.trim(), nameAr: newCat.ar.trim() }] });
+    const newLayout = [...config.layout, { id: 'cat_' + Date.now(), nameEn: newCat.en.trim(), nameAr: newCat.ar.trim() }];
+    onUpdateConfig({ ...config, layout: newLayout });
     setNewCat({ en: '', ar: '' });
   };
 
   const handleAddTag = () => {
-    if (!newTag.en.trim() || !newTag.ar.trim()) return;
-    onUpdateConfig({ ...config, tags: [...config.tags, { id: 'tag_' + Date.now(), nameEn: newTag.en.trim(), nameAr: newTag.ar.trim() }] });
+    const en = newTag.en.trim();
+    const ar = newTag.ar.trim();
+    if (!en || !ar) return;
+    const tag = { id: 'tag_' + Date.now(), nameEn: en, nameAr: ar };
+    onUpdateConfig({ ...config, tags: [...config.tags, tag] });
     setNewTag({ en: '', ar: '' });
   };
 
@@ -204,22 +220,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
 
   const handleFile = (file: File, type: 'banner' | 'product' | 'logoRed' | 'logoWhite') => {
     if (!file.type.startsWith('image/')) return;
+    
+    // For local-only, use FileReader to generate a base64 string
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      if (type === 'banner' && editingBanner) { setEditingBanner({ ...editingBanner, image: base64 }); } 
-      else if (type === 'product' && editingProduct) { setEditingProduct({ ...editingProduct, image: base64 }); } 
-      else if (type === 'logoRed') { onUpdateConfig({ ...config, header: { ...config.header, logoRed: base64 } }); } 
-      else if (type === 'logoWhite') { onUpdateConfig({ ...config, header: { ...config.header, logoWhite: base64 } }); }
+    reader.onloadend = () => {
+      const publicUrl = reader.result as string;
+      if (type === 'banner' && editingBanner) { setEditingBanner({ ...editingBanner, image: publicUrl }); } 
+      else if (type === 'product' && editingProduct) { setEditingProduct({ ...editingProduct, image: publicUrl }); } 
+      else if (type === 'logoRed') { onUpdateConfig({ ...config, header: { ...config.header, logoRed: publicUrl } }); } 
+      else if (type === 'logoWhite') { onUpdateConfig({ ...config, header: { ...config.header, logoWhite: publicUrl } }); }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSaveCloudConfig = () => {
-    onUpdateConfig({ ...config, cloudConfig: cloudSettings });
-    alert('Cloud configuration updated.');
-    window.location.reload();
-  };
 
   if (!isOpen) return null;
 
@@ -242,12 +255,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] mt-1">ADMIN V10.2 • TOP-BAR NAV</p>
             </div>
           </div>
-
           <div className="flex items-center gap-2 bg-slate-200/50 p-1.5 rounded-[2rem]">
-            <button onClick={() => setActiveTab('menu')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'menu' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Database size={16} /> MENU</button>
-            <button onClick={() => setActiveTab('builder')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'builder' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Settings2 size={16} /> BUILDER</button>
+            <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'orders' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><ListOrdered size={16} /> ORDERS</button>
             <button onClick={() => setActiveTab('areas')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'areas' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Truck size={16} /> LOGISTICS</button>
-            <button onClick={() => setActiveTab('cloud')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'cloud' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-400 hover:bg-white'}`}><Cloud size={16} /> CLOUD</button>
+            <button onClick={() => setActiveTab('builder')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'builder' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Settings2 size={16} /> BUILDER</button>
+            <button onClick={() => setActiveTab('menu')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'menu' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Database size={16} /> MENU</button>
           </div>
 
           <div className="flex items-center gap-4">
@@ -262,6 +274,121 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
 
         <div className="flex-1 overflow-hidden flex flex-col bg-white">
           <div className="flex-1 overflow-y-auto no-scrollbar p-12 bg-slate-50/50">
+
+
+            {activeTab === 'orders' && (
+              <div className="space-y-10 animate-reveal pb-20">
+                <div className="flex items-center justify-between bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm">
+                  <h3 className="text-3xl font-black brand-font uppercase text-slate-900">Customer Orders</h3>
+                  <button onClick={() => { if(confirm('Clear all orders?')) { localStorage.removeItem('chicky_orders'); setOrders([]); } }} className="text-[10px] font-black uppercase text-red-600 tracking-widest hover:underline">Clear History</button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6">
+                  {orders.length === 0 ? (
+                    <div className="bg-white p-20 rounded-[3.5rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-slate-300 italic">
+                      No orders recorded yet.
+                    </div>
+                  ) : (
+                    orders.map(order => (
+                      <div key={order.id} className="bg-white p-10 rounded-[4rem] border-2 border-slate-50 shadow-sm hover:border-red-600 transition-all flex flex-col gap-8">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b pb-8">
+                          <div className="flex items-center gap-6">
+                            <div className="w-16 h-16 bg-slate-900 text-white rounded-3xl flex items-center justify-center font-black brand-font text-lg shadow-xl shrink-0">
+                              {order.id.slice(-2)}
+                            </div>
+                            <div>
+                               <h4 className="font-black text-2xl text-slate-900 tracking-tight leading-none mb-2 capitalize">{order.customerName}</h4>
+                               <div className="flex items-center gap-4">
+                                 <span className="text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50 px-3 py-1 rounded-full">{order.id}</span>
+                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(order.createdAt).toLocaleString()}</span>
+                               </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-4 items-center">
+                             <div className="text-right">
+                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Total Price</span>
+                               <span className="text-2xl font-black text-slate-900">{order.totalPrice} LE</span>
+                             </div>
+                             <div className={`p-4 rounded-2xl flex items-center gap-3 border-2 ${
+                               order.status === 'pending' ? 'bg-orange-50 border-orange-100 text-orange-600' : 
+                               order.status === 'completed' ? 'bg-green-50 border-green-100 text-green-600' : 
+                               'bg-slate-50 border-slate-100 text-slate-400'
+                             }`}>
+                               <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${
+                                 order.status === 'pending' ? 'bg-orange-600' : order.status === 'completed' ? 'bg-green-600' : 'bg-slate-400'
+                               }`} />
+                               <span className="text-[10px] font-black uppercase tracking-widest font-arabic">{order.status === 'pending' ? 'قيد التنفيذ' : order.status === 'completed' ? 'تم التوصيل' : 'ملغي'}</span>
+                             </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                          <div className="space-y-6">
+                             <div className="space-y-4">
+                                <h5 className="text-[11px] font-black text-slate-300 uppercase tracking-[0.3em] flex items-center gap-3">
+                                  <Truck size={14} className="text-red-600" /> Delivery Details
+                                </h5>
+                                <div className="space-y-3">
+                                   <div className="flex items-center gap-4 text-slate-900 font-bold">
+                                      <Phone size={16} className="text-slate-300" /> {order.phone}
+                                   </div>
+                                   <div className="flex items-start gap-4 text-slate-500 font-medium text-sm leading-relaxed">
+                                      <MapPin size={16} className="text-slate-300 mt-1 shrink-0" /> {order.address} ({order.area})
+                                   </div>
+                                   <a 
+                                    href={`https://www.google.com/maps?q=${order.location.lat},${order.location.lng}`} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="flex items-center gap-3 text-[10px] font-black text-red-600 uppercase tracking-widest hover:underline pt-2"
+                                   >
+                                     <Navigation size={14} fill="currentColor" /> View Exact Pin on Maps
+                                   </a>
+                                </div>
+                             </div>
+                          </div>
+                          
+                          <div className="space-y-4">
+                             <h5 className="text-[11px] font-black text-slate-300 uppercase tracking-[0.3em] flex items-center gap-3">
+                               <Layout size={14} className="text-red-600" /> Order Summary
+                             </h5>
+                             <div className="bg-slate-50 rounded-3xl p-6 space-y-4">
+                                {order.items.map((item, idx) => (
+                                  <div key={idx} className="flex justify-between items-center text-sm">
+                                    <div className="flex items-center gap-3">
+                                      <span className="w-7 h-7 bg-white rounded-lg flex items-center justify-center font-black text-[10px] border border-slate-100">{item.quantity}x</span>
+                                      <span className="font-bold text-slate-900">{item.name}</span>
+                                      {item.selectedSpiciness && (
+                                        <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase border ${item.selectedSpiciness === 'Spicy' ? 'border-red-200 text-red-600 bg-red-50' : 'border-slate-200 text-slate-400 bg-white'}`}>
+                                          {item.selectedSpiciness}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="font-black text-slate-400">{item.price * item.quantity} LE</span>
+                                  </div>
+                                ))}
+                             </div>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-4 pt-4 border-t border-slate-50">
+                           <button onClick={() => { 
+                             const updated = orders.map(o => o.id === order.id ? {...o, status: 'completed' as const} : o);
+                             localStorage.setItem('chicky_orders', JSON.stringify(updated));
+                             setOrders(updated);
+                           }} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-green-600 transition-all active:scale-95 shadow-lg">Mark as Completed</button>
+                           
+                           <button onClick={() => { 
+                             const updated = orders.map(o => o.id === order.id ? {...o, status: 'cancelled' as const} : o);
+                             localStorage.setItem('chicky_orders', JSON.stringify(updated));
+                             setOrders(updated);
+                           }} className="py-4 px-8 bg-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-50 hover:text-red-600 transition-all active:scale-95">Cancel</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
             {activeTab === 'menu' && (
               <div className="space-y-10 animate-reveal pb-20">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm">
@@ -305,7 +432,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                         </div>
                         <div className="flex sm:flex-col gap-3 shrink-0">
                           <button onClick={() => { setEditingProduct(product); setIsProductFormOpen(true); }} className="p-4 bg-slate-50 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-[1.5rem] transition-all"><Edit2 size={20} /></button>
-                          <button onClick={() => { if(confirm('Delete product?')) onUpdateMenu(menu.filter(p => p.id !== product.id)); }} className="p-4 bg-slate-50 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-[1.5rem] transition-all"><Trash2 size={20} /></button>
+                          <button onClick={() => { onUpdateMenu(menu.filter(p => p.id !== product.id)); }} className="p-4 bg-slate-50 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-[1.5rem] transition-all"><Trash2 size={20} /></button>
                         </div>
                       </div>
                     );
@@ -377,7 +504,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                              </div>
                              <div className="flex gap-4">
                                <button onClick={() => { setEditingBanner(b); setIsBannerFormOpen(true); }} className="p-5 bg-slate-50 text-slate-300 hover:text-red-600 rounded-[1.5rem] transition-all"><Edit2 size={24} /></button>
-                               <button onClick={() => { if(confirm('Delete offer?')) onUpdateConfig({...config, hero: { banners: config.hero.banners.filter(x => x.id !== b.id)}}); }} className="p-5 bg-slate-50 text-slate-300 hover:text-slate-900 rounded-[1.5rem] transition-all"><Trash2 size={24} /></button>
+                               <button onClick={() => { if(confirm('Delete offer?')) { onUpdateConfig({...config, hero: { banners: config.hero.banners.filter(x => x.id !== b.id)}}); } }} className="p-5 bg-slate-50 text-slate-300 hover:text-slate-900 rounded-[1.5rem] transition-all"><Trash2 size={24} /></button>
                              </div>
                            </div>
                          ))}
@@ -402,7 +529,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                                  <span className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center font-black text-xs text-red-600 border-2 border-slate-100 shadow-sm">{idx+1}</span>
                                  <div><h5 className="font-black text-slate-900 uppercase text-lg leading-none mb-1">{cat.nameEn}</h5><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{cat.nameAr}</p></div>
                                </div>
-                               <button onClick={() => { if(confirm('Delete?')) onUpdateConfig({...config, layout: config.layout.filter(l => l.id !== cat.id)}); }} className="p-4 text-slate-300 hover:text-slate-900 transition-all"><Trash2 size={20} /></button>
+                               <button onClick={() => { if(confirm('Delete?')) { onUpdateConfig({...config, layout: config.layout.filter(l => l.id !== cat.id)}); } }} className="p-4 text-slate-300 hover:text-slate-900 transition-all"><Trash2 size={20} /></button>
                              </div>
                            ))}
                          </div>
@@ -417,11 +544,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 bg-slate-50 rounded-[3rem] border border-slate-100">
                            <div>
                               <label className={labelStyle}>Filter Bar Title (EN)</label>
-                              <input className={inputStyle} value={config.filterLabelEn} onChange={e => onUpdateConfig({...config, filterLabelEn: e.target.value})} />
+                              <input 
+                                 className={inputStyle} 
+                                 value={localFilterLabelEn} 
+                                 onChange={e => setLocalFilterLabelEn(e.target.value)}
+                                 onBlur={() => onUpdateConfig({...config, filterLabelEn: localFilterLabelEn})} 
+                               />
                            </div>
                            <div>
                               <label className={labelStyle}>عنوان شريط التصفية (AR)</label>
-                              <input dir="rtl" className={inputStyle + " font-arabic"} value={config.filterLabelAr} onChange={e => onUpdateConfig({...config, filterLabelAr: e.target.value})} />
+                              <input 
+                                 dir="rtl" 
+                                 className={inputStyle + " font-arabic"} 
+                                 value={localFilterLabelAr} 
+                                 onChange={e => setLocalFilterLabelAr(e.target.value)}
+                                 onBlur={() => onUpdateConfig({...config, filterLabelAr: localFilterLabelAr})} 
+                               />
                            </div>
                         </div>
 
@@ -436,6 +574,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                           </div>
                           
                           <div className="space-y-4">
+                            {config.tags.length === 0 && (
+                               <div className="text-center py-10 bg-white rounded-[2rem] border-2 border-dashed border-slate-100 italic text-slate-400 font-medium font-arabic">
+                                 {config.branchStatus === 'open' ? 'لا يوجد وسوم مضافة حالياً. استخدم الحقول أعلاه لإضافة وسم جديد.' : 'No tags added yet. Use the fields above to create labels.'}
+                               </div>
+                            )}
                             {config.tags.map((tag) => (
                               <div key={tag.id} className="flex items-center justify-between p-6 bg-white rounded-[2rem] border-2 border-slate-50 hover:border-red-100 transition-all group">
                                 <div className="flex items-center gap-4">
@@ -444,10 +587,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                                   </div>
                                   <div>
                                     <h5 className="font-black text-slate-900 uppercase text-sm leading-none">{tag.nameEn}</h5>
-                                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{tag.nameAr}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest leading-none">{tag.nameAr}</p>
                                   </div>
                                 </div>
-                                <button onClick={() => { if(confirm('Remove tag?')) onUpdateConfig({...config, tags: config.tags.filter(t => t.id !== tag.id)}); }} className="p-3 text-slate-200 hover:text-red-600 transition-colors">
+                                <button onClick={() => onUpdateConfig({...config, tags: config.tags.filter(t => t.id !== tag.id)})} className="p-3 text-slate-200 hover:text-red-600 transition-colors">
                                   <Trash2 size={20} />
                                 </button>
                               </div>
@@ -476,17 +619,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
             {activeTab === 'areas' && (
               <div className="h-full flex flex-col lg:flex-row gap-8 animate-reveal pb-20 overflow-hidden">
                 <div className="w-full lg:w-[450px] flex flex-col h-full bg-white rounded-[4rem] p-10 border border-slate-100 shadow-xl z-20 overflow-y-auto no-scrollbar relative shrink-0">
-                  <div className="flex items-center justify-between mb-10 border-b pb-6">
-                    <div className="flex items-center gap-4">
-                       <div className="bg-red-600 p-3.5 rounded-2xl shadow-xl shadow-red-200 text-white"><MapIcon size={24} /></div>
-                       <h3 className="text-2xl font-black brand-font uppercase text-slate-900">Zone Manager</h3>
+                    <div className="flex flex-col gap-4 mb-10 border-b pb-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                           <div className="bg-red-600 p-3.5 rounded-2xl shadow-xl shadow-red-200 text-white"><MapIcon size={24} /></div>
+                           <h3 className="text-2xl font-black brand-font uppercase text-slate-900">Zone Manager</h3>
+                        </div>
+                        {drawingMode && (
+                          <span className="flex items-center gap-2 bg-red-100 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse">
+                            <Navigation size={12} fill="currentColor" /> Drawing Active
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Branch Status Toggle */}
+                      <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${config.branchStatus === 'open' ? 'bg-green-500 animate-pulse' : 'bg-red-600'}`} />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                            Branch Status: {config.branchStatus === 'open' ? 'Accepting Orders' : 'Closed'}
+                          </span>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            const newStatus = config.branchStatus === 'open' ? 'closed' : 'open';
+                            onUpdateConfig({ ...config, branchStatus: newStatus });
+                          }}
+                          className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${config.branchStatus === 'open' ? 'bg-red-600 text-white shadow-lg shadow-red-100' : 'bg-green-600 text-white shadow-lg shadow-green-100'}`}
+                        >
+                          {config.branchStatus === 'open' ? 'Close Branch' : 'Open Branch'}
+                        </button>
+                      </div>
                     </div>
-                    {drawingMode && (
-                      <span className="flex items-center gap-2 bg-red-100 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse">
-                        <Navigation size={12} fill="currentColor" /> Drawing Active
-                      </span>
-                    )}
-                  </div>
 
                   {!drawingMode ? (
                     <div className="space-y-6">
@@ -513,7 +677,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{area.nameEn} • {area.fee} LE Fee</p>
                                </div>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); if(confirm('Remove this delivery zone?')) onUpdateConfig({...config, areas: config.areas.filter(a => a.id !== area.id)}); refreshExistingZones(); }} 
+                            <button onClick={(e) => { e.stopPropagation(); onUpdateConfig({...config, areas: config.areas.filter(a => a.id !== area.id)}); refreshExistingZones(); }} 
                               className="p-3 text-slate-200 hover:text-red-600 hover:bg-white rounded-xl transition-all opacity-0 group-hover:opacity-100">
                               <Trash2 size={20} />
                             </button>
@@ -590,30 +754,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
               </div>
             )}
 
-            {activeTab === 'cloud' && (
-              <div className="h-full flex items-center justify-center p-12 animate-reveal">
-                <div className="max-w-4xl w-full space-y-12">
-                   <div className="flex items-center gap-12 bg-white p-16 rounded-[4rem] shadow-sm border border-slate-100">
-                      <div className={`p-10 rounded-[3rem] shadow-2xl ${config.cloudConfig?.projectId ? 'bg-green-600 text-white' : 'bg-slate-900 text-slate-400'}`}>
-                        {config.cloudConfig?.projectId ? <Cloud size={80} /> : <CloudOff size={80} />}
-                      </div>
-                      <div className="space-y-4">
-                        <h3 className="text-6xl font-black brand-font uppercase text-slate-900 leading-none">Cloud Sync</h3>
-                        <p className="text-slate-400 font-black text-sm uppercase tracking-[0.4em]">CONNECTED TO FIRESTORE</p>
-                      </div>
-                   </div>
-                   <div className={cardStyle + " p-16"}>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        <div><label className={labelStyle}>API Key</label><input className={inputStyle} value={cloudSettings.apiKey} onChange={e => setCloudSettings({...cloudSettings, apiKey: e.target.value})} /></div>
-                        <div><label className={labelStyle}>Project ID</label><input className={inputStyle} value={cloudSettings.projectId} onChange={e => setCloudSettings({...cloudSettings, projectId: e.target.value})} /></div>
-                        <div><label className={labelStyle}>Auth Domain</label><input className={inputStyle} value={cloudSettings.authDomain} onChange={e => setCloudSettings({...cloudSettings, authDomain: e.target.value})} /></div>
-                        <div><label className={labelStyle}>App ID</label><input className={inputStyle} value={cloudSettings.appId} onChange={e => setCloudSettings({...cloudSettings, appId: e.target.value})} /></div>
-                      </div>
-                      <button onClick={handleSaveCloudConfig} className="w-full bg-slate-950 text-white font-black py-8 rounded-[2rem] flex items-center justify-center gap-6 hover:bg-red-600 transition-all uppercase tracking-[0.2em] text-xl shadow-2xl active:scale-95"><Save size={32} /> Connect Database</button>
-                   </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -691,6 +831,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                  <div className="space-y-10">
                     <div><label className={labelStyle}>Headline (EN)</label><input className={inputStyle} value={editingBanner.titleEn} onChange={e => setEditingBanner({...editingBanner, titleEn: e.target.value})} required /></div>
                     <div><label className={labelStyle}>العنوان (AR)</label><input dir="rtl" className={inputStyle + " font-arabic"} value={editingBanner.titleAr} onChange={e => setEditingBanner({...editingBanner, titleAr: e.target.value})} required /></div>
+                    <div><label className={labelStyle}>Subtitle (EN)</label><input className={inputStyle} value={editingBanner.subtitleEn} placeholder="e.g. Dinner Box" onChange={e => setEditingBanner({...editingBanner, subtitleEn: e.target.value})} required /></div>
+                    <div><label className={labelStyle}>العنوان الفرعي (AR)</label><input dir="rtl" className={inputStyle + " font-arabic"} value={editingBanner.subtitleAr} placeholder="مثال: بوكس العشاء" onChange={e => setEditingBanner({...editingBanner, subtitleAr: e.target.value})} required /></div>
                  </div>
                  <div className="space-y-10">
                     <div className="grid grid-cols-2 gap-8">

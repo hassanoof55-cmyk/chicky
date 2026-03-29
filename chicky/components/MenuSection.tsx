@@ -1,16 +1,17 @@
 
 import React, { useState } from 'react';
 import { Plus, Flame, CheckCircle, X, Star } from 'lucide-react';
-import { Product, Language, CategoryConfig } from '../types';
+import { Product, Language, CategoryConfig, TagConfig } from '../types';
 
 interface MenuSectionProps {
   category: CategoryConfig;
   items: Product[];
   onAddToCart: (product: Product, spiciness?: 'Normal' | 'Spicy') => void;
   lang: Language;
+  tagsConfig: TagConfig[];
 }
 
-const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart, lang }) => {
+const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart, lang, tagsConfig }) => {
   const [animatingId, setAnimatingId] = useState<string | null>(null);
   const [showOptionsId, setShowOptionsId] = useState<string | null>(null);
 
@@ -105,14 +106,18 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
-                  {item.tags?.map(tag => (
-                    <span key={tag} className="bg-white/90 backdrop-blur-md text-red-600 text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg border border-white/20">
-                      {tag}
-                    </span>
-                  ))}
+                  {item.tags?.map(tag => {
+                    const tagObj = tagsConfig?.find(t => t.nameEn.toLowerCase() === tag.toLowerCase());
+                    const displayName = isAr ? (tagObj?.nameAr || tag) : (tagObj?.nameEn || tag);
+                    return (
+                      <span key={tag} className="bg-white/90 backdrop-blur-md text-red-600 text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg border border-white/20">
+                        {displayName}
+                      </span>
+                    );
+                  })}
                   {item.isSpicy && (
                     <span className="bg-red-600/90 backdrop-blur-md text-white text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg flex items-center gap-2">
-                      <Flame size={10} fill="currentColor" /> SPICY
+                       <Flame size={10} fill="currentColor" /> {isAr ? 'حار' : 'SPICY'}
                     </span>
                   )}
                 </div>

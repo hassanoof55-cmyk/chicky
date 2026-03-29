@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle, Truck, MapPin, Phone, User, Loader2, AlertCircle, LayoutList, Map as MapIcon, ChevronRight, ChevronLeft, MessageSquare, Send, Navigation } from 'lucide-react';
 import { OrderDetails, LocationData, Area, CartItem, Language } from '../types';
 import { getStoredConfig } from '../data/menuData';
+import { supabase } from '../lib/supabase';
 
 declare var L: any;
 
@@ -184,9 +185,30 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, subtotal
     }
   };
 
-  const handleFinalConfirm = () => {
+  const handleFinalConfirm = async () => {
     const newId = 'CH-' + Math.floor(10000 + Math.random() * 90000);
     setOrderId(newId);
+
+    // Save to Local Storage
+    try {
+      const existingOrders = JSON.parse(localStorage.getItem('chicky_orders') || '[]');
+      const newOrder = {
+        id: newId,
+        customerName: details.name,
+        phone: details.phone,
+        address: details.address,
+        area: selectedArea?.nameEn || 'N/A',
+        location: { lat: location.lat, lng: location.lng },
+        items: cartItems,
+        totalPrice: finalTotal,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      localStorage.setItem('chicky_orders', JSON.stringify([newOrder, ...existingOrders]));
+    } catch (err) {
+      console.error('Error saving order locally:', err);
+    }
+
     onConfirm({...details, location: { lat: location.lat, lng: location.lng, address: details.address, deliveryFee: currentFee, areaId: selectedArea?.id }});
     setStep(4);
     sendOrderToRestaurant(newId);
