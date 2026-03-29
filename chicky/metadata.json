@@ -1,0 +1,7 @@
+{
+  "name": "Chicky Fried Chicken - Official Site",
+  "description": "A premium, KFC-inspired food ordering web application for Chicky, featuring a modern UI, responsive menu, and cart functionality.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
