@@ -189,7 +189,25 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, subtotal
     const newId = 'CH-' + Math.floor(10000 + Math.random() * 90000);
     setOrderId(newId);
 
-    // Save to Local Storage
+    // 1. Save to Supabase (Global Live Sync)
+    try {
+      const { error } = await supabase.from('orders').insert({
+        id: newId,
+        customer_name: details.name,
+        phone: details.phone,
+        address: details.address,
+        area: selectedArea?.nameEn || 'N/A',
+        location: { lat: location.lat, lng: location.lng },
+        items: cartItems,
+        total_price: finalTotal,
+        status: 'pending'
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error saving order to Supabase:', err);
+    }
+
+    // 2. Save to Local Storage (Fallback)
     try {
       const existingOrders = JSON.parse(localStorage.getItem('chicky_orders') || '[]');
       const newOrder = {
@@ -251,6 +269,7 @@ _Sent via Chicky Web App_`
     onClearCart();
     onClose();
   };
+
 
   if (!isOpen) return null;
 
@@ -405,12 +424,13 @@ _Sent via Chicky Web App_`
             <div className="text-center space-y-10 py-12 animate-reveal">
               <div className="relative inline-block">
                 <div className="absolute inset-0 bg-green-500 blur-3xl opacity-20 animate-pulse" />
-                <div className="bg-green-100 w-40 h-40 rounded-[4rem] flex items-center justify-center mx-auto border-8 border-white shadow-2xl">
-                  <CheckCircle size={100} className="text-green-600" />
+                <div className="bg-green-100 w-32 h-32 rounded-[3.5rem] flex items-center justify-center mx-auto border-4 border-white shadow-2xl">
+                  <CheckCircle size={80} className="text-green-600" />
                 </div>
               </div>
+
               <div>
-                <h3 className={`text-6xl font-black ${isAr ? 'font-arabic' : 'brand-font'} uppercase text-slate-900 leading-none`}>{t.successTitle}</h3>
+                <h3 className={`text-4xl font-black ${isAr ? 'font-arabic' : 'brand-font'} uppercase text-slate-900 leading-none`}>{t.successTitle}</h3>
                 <p className="text-slate-400 font-black text-sm uppercase tracking-[0.3em] mt-4">{t.successSub}</p>
               </div>
 
@@ -422,21 +442,12 @@ _Sent via Chicky Web App_`
 
                 <div className={`bg-slate-50 p-6 rounded-3xl ${isAr ? 'text-right' : 'text-left'} border border-slate-100`}>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">{t.trackFood}</p>
-                  
-                  <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-3">
-                    <span className="text-xs font-black text-slate-900 uppercase">{isAr ? 'المجموع الكلي' : 'Grand Total'}</span>
-                    <span className="text-lg font-black text-red-600">{finalTotal} {isAr ? 'ج.م' : 'LE'}</span>
-                  </div>
-
                   <div className="space-y-3">
-                    <button onClick={() => sendOrderToRestaurant()} className="w-full bg-slate-950 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg active:scale-95 text-xs tracking-widest uppercase border-2 border-slate-950 hover:bg-white hover:text-slate-950">
-                      <Send size={18} className={isAr ? 'rotate-180' : ''} />
-                      {t.sendOrder}
+                    <button onClick={() => sendOrderToRestaurant()} className="w-full bg-slate-950 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg active:scale-95 text-xs tracking-widest uppercase border-2 border-slate-950">
+                      <Send size={18} className={isAr ? 'rotate-180' : ''} /> {t.sendOrder}
                     </button>
-                    
                     <button onClick={() => { const targetNumber = '201220062060'; const msg = isAr ? `مرحباً شيكي! 🍗 أريد تتبع الطلب رقم #${orderId}.` : `Hello Chicky! 🍗 I'd like to track my order #${orderId}.`; window.open(`https://wa.me/${targetNumber}?text=${encodeURIComponent(msg)}`, '_blank'); }} className="w-full bg-green-500 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg active:scale-95 text-xs tracking-widest uppercase">
-                      <MessageSquare size={18} fill="white" />
-                      {t.trackWa}
+                      <MessageSquare size={18} fill="white" /> {t.trackWa}
                     </button>
                   </div>
                 </div>

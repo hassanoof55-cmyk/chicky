@@ -11,8 +11,9 @@ import Footer from './components/Footer';
 import WhatsAppFloat from './components/WhatsAppFloat';
 import { getStoredMenu, saveMenuToStorage, getStoredConfig, saveConfigToStorage } from './data/menuData';
 import { Product, CartItem, Language, OrderDetails, SiteConfig } from './types';
+import { supabase } from './lib/supabase';
 // Added Search to the lucide-react imports
-import { ArrowRight, Sparkles, Zap, Tag, Tag as TagIcon, X, Search } from 'lucide-react';
+import { ArrowRight, Sparkles, Zap, Tag, Tag as TagIcon, X, Search, Flame } from 'lucide-react';
 
 const App: React.FC = () => {
   const [menu, setMenu] = useState<Product[]>(getStoredMenu());
@@ -43,9 +44,76 @@ const App: React.FC = () => {
   }, [config.hero.banners.length]);
 
   useEffect(() => {
+    // 1. Fetch Menu Items (Live Data)
+    const fetchMenu = async () => {
+      const { data, error } = await supabase
+        .from('menu_items')
+        .select('*');
+      
+      if (!error && data) {
+        setMenu(data as Product[]);
+      }
+    };
+
+    // 2. Fetch Site Config
+    const fetchConfig = async () => {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('config_data')
+        .eq('id', 'active_config')
+        .single();
+      
+      if (!error && data) {
+        setConfig(data.config_data as SiteConfig);
+      }
+    };
+
+    fetchMenu();
+    fetchConfig();
+
     document.documentElement.style.setProperty('--brand-red', config.theme.primaryColor);
     document.documentElement.dir = isAr ? 'rtl' : 'ltr';
-  }, [config.theme.primaryColor, isAr]);
+    
+    // Update Favicon dynamically
+    const link: any = document.querySelector("link[rel*='icon']") || document.createElement('link');
+    link.type = 'image/png';
+    link.rel = 'shortcut icon';
+    link.href = config.header.logoRed;
+    document.getElementsByTagName('head')[0].appendChild(link);
+    
+    // Update Title
+    document.title = isAr ? 'تشيكي فرايد تشيكن | أقوى فرايد تشيكن' : 'Chicky Fried Chicken | Egypt\'s #1';
+  }, [config.theme.primaryColor, isAr, config.header.logoRed]);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch Menu
+        const { data: menuData, error: menuError } = await supabase
+          .from('menu_items')
+          .select('*')
+          .order('created_at', { ascending: true });
+        
+        if (!menuError && menuData && menuData.length > 0) {
+          setMenu(menuData);
+        }
+
+        // Fetch Config
+        const { data: configData, error: configError } = await supabase
+          .from('site_settings')
+          .select('config_data')
+          .eq('id', 'active_config')
+          .single();
+        
+        if (!configError && configData?.config_data) {
+          setConfig(configData.config_data);
+        }
+      } catch (err) {
+        console.error('Initial fetch failed:', err);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const updateMenu = (newMenu: Product[]) => {
     setMenu(newMenu);
@@ -93,6 +161,13 @@ const App: React.FC = () => {
   }, [cart, isAr]);
 
   const addToCart = (product: Product, spiciness?: 'Normal' | 'Spicy') => {
+    // Phase 3: Add to cart animation
+    const cartBtn = document.getElementById('cart-btn');
+    if (cartBtn) {
+      cartBtn.classList.add('animate-bounce');
+      setTimeout(() => cartBtn.classList.remove('animate-bounce'), 1000);
+    }
+
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id && item.selectedSpiciness === spiciness);
       if (existing) {
@@ -201,7 +276,7 @@ const App: React.FC = () => {
                    </div>
                 </div>
                 <div className="flex flex-col sm:flex-row items-center gap-10 pt-4 justify-center md:justify-start">
-                   <button onClick={() => scrollToCategory(config.layout[0]?.id || '')} className="group relative bg-red-600 text-white font-black px-12 py-6 rounded-[2rem] shadow-2xl hover:-translate-y-2 active:scale-95 transition-all text-xl tracking-widest uppercase">
+                   <button onClick={() => scrollToCategory(activeBanner.targetCategoryId || config.layout[0]?.id || '')} className="group relative bg-red-600 text-white font-black px-12 py-6 rounded-[2rem] shadow-2xl hover:-translate-y-2 active:scale-95 transition-all text-xl tracking-widest uppercase">
                      <span className="relative z-10 flex items-center gap-4">{isAr ? 'اطلب الآن' : 'ORDER THE DEAL'} <ArrowRight size={28} className={isAr ? 'rotate-180' : ''} /></span>
                    </button>
                 </div>
@@ -213,6 +288,7 @@ const App: React.FC = () => {
           )}
         </section>
       )}
+
 
       <main className="max-w-7xl mx-auto px-6 md:px-12 py-16">
         

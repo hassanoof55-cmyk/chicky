@@ -66,6 +66,7 @@ export interface HeroBanner {
   ctaTextAr?: string;
   promoTagEn?: string;
   promoTagAr?: string;
+  targetCategoryId?: string;
 }
 
 export interface TagConfig {
