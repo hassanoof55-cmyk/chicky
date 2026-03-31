@@ -21,20 +21,26 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdat
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-  const getItemKey = (item: CartItem) => `${item.id}-${item.selectedSpiciness || 'Default'}-${item.price}`;
+  const getItemKey = (item: CartItem) => {
+    const modifiersKey = JSON.stringify(item.selectedModifiers || []);
+    return `${item.id}-${item.selectedSpiciness || 'Default'}-${item.selectedSize?.id || 'base'}-${modifiersKey}`;
+  };
 
   const handleRemove = (item: CartItem) => {
     const key = getItemKey(item);
+    const modifiersJson = JSON.stringify(item.selectedModifiers || []);
     setRemovingKey(key);
     setTimeout(() => {
-      onRemove(item.id, item.selectedSpiciness, item.price);
+      onRemove(item.id, item.selectedSpiciness, item.price, item.selectedSize?.id, modifiersJson);
       setRemovingKey(null);
     }, 250); 
   };
 
   const handleQuantityUpdate = (item: CartItem, delta: number) => {
-    setLastActionId(getItemKey(item) + '-' + Date.now());
-    onUpdateQuantity(item.id, delta, item.selectedSpiciness, item.price);
+    const key = getItemKey(item);
+    const modifiersJson = JSON.stringify(item.selectedModifiers || []);
+    setLastActionId(key + '-' + Date.now());
+    onUpdateQuantity(item.id, delta, item.selectedSpiciness, item.price, item.selectedSize?.id, modifiersJson);
   };
 
   if (!isOpen) return null;
@@ -100,17 +106,22 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdat
                         <h4 className="font-black text-gray-800 leading-tight text-sm md:text-base">{item.name}</h4>
                         <div className="flex flex-col gap-1">
                           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{item.nameAr}</p>
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-2 mt-1">
                             {item.selectedSize && (
-                              <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-900 text-white border border-slate-950">
+                              <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-900 text-white shadow-sm">
                                 {lang === 'ar' ? item.selectedSize.nameAr : item.selectedSize.nameEn}
                               </span>
                             )}
                             {item.selectedSpiciness && (
-                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border ${item.selectedSpiciness === 'Spicy' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border ${item.selectedSpiciness === 'Spicy' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-100 text-slate-500 border-gray-200'}`}>
                                 {item.selectedSpiciness}
                               </span>
                             )}
+                            {item.selectedModifiers && item.selectedModifiers.map(mod => (
+                              <span key={mod.id} className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-100 shadow-sm">
+                                + {lang === 'ar' ? mod.nameAr : mod.nameEn}
+                              </span>
+                            ))}
                           </div>
                         </div>
                       </div>

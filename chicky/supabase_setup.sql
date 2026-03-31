@@ -42,6 +42,17 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public all access" ON orders;
 CREATE POLICY "Public all access orders" ON orders FOR ALL USING (true);
 
+-- 7. Create logistics_config table for dedicated zones management
+CREATE TABLE IF NOT EXISTS logistics_config (
+    id INT8 PRIMARY KEY DEFAULT 1,
+    areas JSONB DEFAULT '[]'::jsonb,
+    status TEXT DEFAULT 'open',
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE logistics_config ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public all access logistics_config" ON logistics_config FOR ALL USING (true);
+
 -- 7. Insert initial config if not exists (Optional but helpful)
 -- INSERT INTO site_settings (id, config_data) 
 -- VALUES ('active_config', '{...}') 

@@ -40,13 +40,13 @@ const RecommendedSection: React.FC<RecommendedSectionProps> = ({ title, items, o
       {showOptionsId && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-scale-up text-center relative">
-            <button 
-              onClick={() => setShowOptionsId(null)} 
+            <button
+              onClick={() => setShowOptionsId(null)}
               className="absolute top-6 right-6 p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
             >
               <X size={20} />
             </button>
-            
+
             <div className="mb-6">
               <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Flame size={40} className="text-red-600 animate-pulse" fill="currentColor" />
@@ -60,7 +60,7 @@ const RecommendedSection: React.FC<RecommendedSectionProps> = ({ title, items, o
             </div>
 
             <div className="grid grid-cols-1 gap-3">
-              <button 
+              <button
                 onClick={() => {
                   const item = items.find(i => i.id === showOptionsId);
                   if (item) executeAdd(item, 'Normal');
@@ -69,7 +69,7 @@ const RecommendedSection: React.FC<RecommendedSectionProps> = ({ title, items, o
               >
                 🍗 {lang === 'en' ? 'NORMAL' : 'عادي'}
               </button>
-              <button 
+              <button
                 onClick={() => {
                   const item = items.find(i => i.id === showOptionsId);
                   if (item) executeAdd(item, 'Spicy');
@@ -85,27 +85,30 @@ const RecommendedSection: React.FC<RecommendedSectionProps> = ({ title, items, o
 
       <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
         {items.map((item) => (
-          <div 
-            key={item.id} 
+          <div
+            key={item.id}
             className="shrink-0 w-64 bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-lg transition-all p-3 flex flex-col group relative overflow-hidden"
           >
             <div className="relative h-32 rounded-2xl overflow-hidden mb-3">
-              <img 
-                src={item.image} 
-                alt={item.name} 
+              <img
+                src={item.image}
+                alt={item.name}
                 loading="lazy"
                 decoding="async"
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
-              <div className="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded-lg shadow-sm flex flex-col items-end">
-                {item.originalPrice && (
-                  <span className="text-[8px] text-gray-400 line-through leading-none">
-                    {item.originalPrice} LE
+              <div className="absolute top-2 right-2 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-full shadow-xl flex flex-col items-end border border-white/5">
+                {item.originalPrice !== undefined && item.originalPrice > 0 && (
+                  <span className="text-[8px] text-white/20 line-through leading-none mb-0.5 font-bold">
+                    {item.originalPrice}
                   </span>
                 )}
-                <span className="text-[10px] font-black text-red-600 leading-none">
-                  {item.price} LE
-                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-[7px] text-white/40 font-black uppercase tracking-widest">{lang === 'en' ? 'LE' : 'ج.م'}</span>
+                  <span className="text-[11px] font-black text-white leading-none">
+                    {item.price}
+                  </span>
+                </div>
               </div>
             </div>
             <div className="flex-1">
@@ -114,7 +117,7 @@ const RecommendedSection: React.FC<RecommendedSectionProps> = ({ title, items, o
                 {lang === 'en' ? item.description : item.descriptionAr}
               </p>
             </div>
-            <button 
+            <button
               onClick={() => handleAddClick(item)}
               className="mt-3 w-full bg-gray-50 hover:bg-red-600 text-gray-700 hover:text-white font-black py-2 rounded-xl text-xs transition-all flex items-center justify-center gap-2 active:scale-95"
             >

@@ -6,6 +6,13 @@ export interface ProductSize {
   price: number;
 }
 
+export interface Modifier {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  price: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -21,12 +28,14 @@ export interface Product {
   hasSizes?: boolean;
   sizes?: ProductSize[];
   tags?: string[];
+  modifiers?: Modifier[];
 }
 
 export interface CartItem extends Product {
   quantity: number;
   selectedSpiciness?: 'Normal' | 'Spicy';
   selectedSize?: ProductSize;
+  selectedModifiers?: Modifier[];
 }
 
 export interface CategoryConfig {
@@ -36,6 +45,7 @@ export interface CategoryConfig {
 }
 
 export type Language = 'en' | 'ar';
+export type ServiceType = 'delivery' | 'pickup' | 'dine-in';
 
 export interface Area {
   id: string;
@@ -59,6 +69,10 @@ export interface OrderDetails {
   address: string;
   branch: string;
   location?: LocationData;
+  serviceType: ServiceType;
+  scheduledTime?: string;
+  promoCode?: string;
+  discount?: number;
 }
 
 export interface HeroBanner {
@@ -83,6 +97,21 @@ export interface TagConfig {
   id: string;
   nameEn: string;
   nameAr: string;
+}
+
+export interface PromoCode {
+  code: string;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  minOrderValue?: number;
+}
+
+export interface UserProfile {
+  id: string;
+  phone: string;
+  name?: string;
+  savedAddresses?: LocationData[];
+  points: number;
 }
 
 export interface SiteConfig {
@@ -128,4 +157,6 @@ export interface StoredOrder {
   totalPrice: number;
   status: 'pending' | 'completed' | 'cancelled';
   createdAt: string;
+  serviceType: ServiceType;
+  scheduledTime?: string;
 }

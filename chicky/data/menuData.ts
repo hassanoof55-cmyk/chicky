@@ -37,7 +37,11 @@ export const INITIAL_MENU_DATA: Product[] = [
     description: 'Fresh chicken breast with lettuce and mayo',
     descriptionAr: 'صدر دجاج طازج مع خس ومايونيز',
     image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&q=80&w=400',
-    tags: ['Classic']
+    tags: ['Classic'],
+    modifiers: [
+      { id: 'extra-cheese', nameEn: 'Extra Cheese', nameAr: 'جبنة إضافية', price: 15 },
+      { id: 'turkey', nameEn: 'Turkey slice', nameAr: 'شريحة تركي', price: 25 }
+    ]
   },
   {
     id: 'm4',
@@ -50,7 +54,18 @@ export const INITIAL_MENU_DATA: Product[] = [
     descriptionAr: 'صدر مضاعف، جبن ثلاثي، صوص خاص',
     image: 'https://images.unsplash.com/photo-1610440042657-612c34d95e9f?auto=format&fit=crop&q=80&w=400',
     isSpicy: true,
-    tags: ['Spicy', 'Heavy']
+    tags: ['Spicy', 'Heavy'],
+    spicinessOption: true,
+    hasSizes: true,
+    sizes: [
+      { id: 'normal', nameEn: 'Normal', nameAr: 'نورمال', price: 220 },
+      { id: 'duo', nameEn: 'Duo', nameAr: 'ديو', price: 310 },
+      { id: 'triple', nameEn: 'Triple', nameAr: 'تريبل', price: 420 }
+    ],
+    modifiers: [
+      { id: 'jalapeno', nameEn: 'Jalapeno', nameAr: 'هالبينو', price: 10 },
+      { id: 'ranch', nameEn: 'Ranch Sauce', nameAr: 'صوص رانش', price: 20 }
+    ]
   }
 ];
 
@@ -107,7 +122,8 @@ export const INITIAL_SITE_CONFIG: SiteConfig = {
   ],
   areas: [],
   theme: { primaryColor: '#E4002B' },
-  branchStatus: 'open'
+  branchStatus: 'open',
+  branches: ['Alexandria - Palm Beach', 'Alexandria - North Coast', 'Cairo - Maadi']
 };
 
 export const getStoredMenu = (): Product[] => {

@@ -30,9 +30,11 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, onUpdateMenu, config, onUpdateConfig }) => {
-  const [activeTab, setActiveTab] = useState<'menu' | 'builder' | 'areas' | 'orders'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'builder' | 'areas' | 'orders' | 'marketing'>('menu');
   const [builderSubTab, setBuilderSubTab] = useState<'branding' | 'hero' | 'categories' | 'tags' | 'social'>('branding');
   const [orders, setOrders] = useState<StoredOrder[]>([]);
+  const [promoCodes, setPromoCodes] = useState<any[]>([]);
+  const [newPromo, setNewPromo] = useState<any>({ code: '', discount_type: 'percentage', discount_value: 0, min_order_value: 0 });
 
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -85,9 +87,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
 
     fetchOrders();
 
+    // 3. Fetch Promo Codes
+    const fetchPromoCodes = async () => {
+      const { data, error } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
+      if (!error && data) setPromoCodes(data);
+    };
+    fetchPromoCodes();
+
     // 2. Real-time Subscription
     const channel = supabase
-      .channel('realtime_orders')
+      .channel('realtime_admin')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
         const newOrder = payload.new;
         const mapped = {
@@ -107,6 +116,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
         // Sound Notification
         const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
         audio.play().catch(() => { });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'promo_codes' }, () => {
+        fetchPromoCodes();
       })
       .subscribe();
 
@@ -282,6 +294,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const syncConfig = async (newConfig: SiteConfig) => {
     onUpdateConfig(newConfig);
     try {
+      // 1. Sync to site_settings (Standard config storage)
       const { error } = await supabase
         .from('site_settings')
         .upsert({ 
@@ -290,11 +303,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
         });
 
       if (error) {
-        console.error('Supabase Sync Error:', error);
-        alert('Failed to sync changes to Supabase: ' + error.message);
+        console.error('Supabase Sync Error (site_settings):', error);
+        alert('Failed to sync changes to site_settings: ' + error.message);
       } else {
-        console.log('Successfully synced to Supabase');
+        console.log('Successfully synced to site_settings');
       }
+
+      // 2. Sync to logistics_config (Specific table shown in Supabase dashboard)
+      const { error: logisticsError } = await supabase
+        .from('logistics_config')
+        .upsert({
+          id: 1,
+          areas: newConfig.areas,
+          status: newConfig.branchStatus,
+          updated_at: new Date().toISOString()
+        });
+      
+      if (logisticsError) {
+        console.error('Supabase Sync Error (logistics_config):', logisticsError);
+        // We'll keep this as a console error for now to avoid double alerts, 
+        // but it ensures the data is reflected if the table exists.
+      } else {
+        console.log('Successfully synced to logistics_config');
+      }
+
     } catch (err: any) {
       console.error('Config sync failed:', err);
       alert('Network error while saving to cloud.');
@@ -380,6 +412,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
           </div>
           <div className="flex items-center gap-2 bg-slate-200/50 p-1.5 rounded-[2rem]">
             <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'orders' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><ListOrdered size={16} /> ORDERS</button>
+            <button onClick={() => setActiveTab('marketing')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'marketing' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><TagIcon size={16} /> MARKETING</button>
             <button onClick={() => setActiveTab('areas')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'areas' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Truck size={16} /> LOGISTICS</button>
             <button onClick={() => setActiveTab('builder')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'builder' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Settings2 size={16} /> BUILDER</button>
             <button onClick={() => setActiveTab('menu')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'menu' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Database size={16} /> MENU</button>
@@ -560,6 +593,76 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'marketing' && (
+              <div className="space-y-12 animate-reveal">
+                <div className="flex justify-between items-center bg-white p-10 rounded-[3rem] shadow-xl">
+                  <div>
+                    <h3 className="text-4xl font-black brand-font text-slate-900 uppercase">Promo Codes</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">{promoCodes.length} ACTIVE CAMPAIGNS</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <input className={inputStyle + " w-40"} placeholder="CODE10" value={newPromo.code} onChange={e => setNewPromo({...newPromo, code: e.target.value.toUpperCase()})} />
+                    <select className={inputStyle + " w-40"} value={newPromo.discount_type} onChange={e => setNewPromo({...newPromo, discount_type: e.target.value})}>
+                      <option value="percentage">% PERCENTAGE</option>
+                      <option value="fixed">FIXED VALUE</option>
+                    </select>
+                    <input type="number" className={inputStyle + " w-24"} placeholder="Value" value={newPromo.discount_value} onChange={e => setNewPromo({...newPromo, discount_value: Number(e.target.value)})} />
+                    <button 
+                      onClick={async () => {
+                        if (!newPromo.code) return;
+                        await supabase.from('promo_codes').upsert(newPromo);
+                        setNewPromo({ code: '', discount_type: 'percentage', discount_value: 0, min_order_value: 0 });
+                      }}
+                      className="bg-slate-950 text-white px-8 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-600 transition-all"
+                    >
+                      Deploy Code
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {promoCodes.map(pc => (
+                    <div key={pc.code} className="bg-white p-10 rounded-[3.5rem] shadow-xl border border-slate-100 flex flex-col justify-between">
+                      <div className="flex justify-between items-start mb-10">
+                        <div className="p-4 bg-slate-50 rounded-2xl"><TagIcon size={24} className="text-red-600" /></div>
+                        <button 
+                          onClick={async () => { if(confirm('Delete promo?')) await supabase.from('promo_codes').delete().eq('code', pc.code); }}
+                          className="p-3 text-slate-300 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 size={24} />
+                        </button>
+                      </div>
+                      <div>
+                        <h4 className="text-3xl font-black text-slate-950 tracking-tight uppercase leading-none">{pc.code}</h4>
+                        <div className="flex items-center gap-3 mt-4">
+                           <span className="bg-green-100 text-green-700 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">
+                             {pc.discount_value}{pc.discount_type === 'percentage' ? '%' : ' LE'} OFF
+                           </span>
+                           {pc.min_order_value > 0 && (
+                             <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">
+                               MIN {pc.min_order_value} LE
+                             </span>
+                           )}
+                        </div>
+                      </div>
+                      <div className="mt-10 pt-10 border-t-2 border-slate-50 flex items-center justify-between">
+                         <div className="flex items-center gap-4">
+                            <div className={`w-3 h-3 rounded-full ${pc.is_active ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-slate-300'}`}></div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{pc.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
+                         </div>
+                         <button 
+                           onClick={async () => await supabase.from('promo_codes').update({ is_active: !pc.is_active }).eq('code', pc.code)}
+                           className="text-[10px] font-black text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl uppercase tracking-widest"
+                         >
+                           TOGGLE STATUS
+                         </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -756,21 +859,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                     </div>
 
                     {/* Branch Status Toggle */}
-                    <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full ${config.branchStatus === 'open' ? 'bg-green-500 animate-pulse' : 'bg-red-600'}`} />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    <div className="flex items-center justify-between bg-white p-8 rounded-[2.5rem] border border-slate-100 mb-8 shadow-sm">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-4 h-4 rounded-full ${config.branchStatus === 'open' ? 'bg-green-500 animate-pulse' : 'bg-red-600'}`} />
+                        <h4 className="text-sm font-black uppercase tracking-widest text-slate-900 leading-none">
                           Branch Status: {config.branchStatus === 'open' ? 'Accepting Orders' : 'Closed'}
-                        </span>
+                        </h4>
                       </div>
                       <button
-                        onClick={() => {
-                          const newStatus = config.branchStatus === 'open' ? 'closed' : 'open';
-                          syncConfig({ ...config, branchStatus: newStatus });
-                        }}
-                        className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${config.branchStatus === 'open' ? 'bg-red-600 text-white shadow-lg shadow-red-100' : 'bg-green-600 text-white shadow-lg shadow-green-100'}`}
+                        onClick={() => syncConfig({ ...config, branchStatus: config.branchStatus === 'open' ? 'closed' : 'open' })}
+                        className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] transition-all shadow-lg ${config.branchStatus === 'open' ? 'bg-red-600 text-white shadow-red-100' : 'bg-green-600 text-white shadow-green-100'}`}
                       >
-                        {config.branchStatus === 'open' ? 'Close Branch' : 'Open Branch'}
+                        {config.branchStatus === 'open' ? 'Go Offline' : 'Go Online'}
                       </button>
                     </div>
                   </div>
@@ -971,6 +1071,51 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                     setEditingProduct({ ...editingProduct, hasSizes: checked, sizes: checked ? defaultSizes : [] });
                   }} className="w-8 h-8 rounded-xl accent-red-600" /> <span className="group-hover:text-red-600">📏 Multi-Size Options</span></label>
                 )}
+              </div>
+
+              {/* Modifiers / Extras Section */}
+              <div className="p-10 bg-slate-50 rounded-[3rem] border-2 border-slate-100 space-y-8">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Plus size={24} className="text-red-600" />
+                    <h4 className="text-lg font-black brand-font uppercase tracking-tight text-slate-900">Customization Extras</h4>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      const newMods = [...(editingProduct.modifiers || []), { id: 'm_'+Date.now(), nameEn: '', nameAr: '', price: 0 }];
+                      setEditingProduct({...editingProduct, modifiers: newMods});
+                    }}
+                    className="bg-slate-900 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                  >
+                    + Add Extra
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  {(editingProduct.modifiers || []).map((mod, idx) => (
+                    <div key={mod.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 items-end">
+                      <div className="md:col-span-1"><label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Name EN</label><input className={inputStyle + " h-10 text-xs"} value={mod.nameEn} onChange={e => {
+                        const newMods = [...(editingProduct.modifiers || [])];
+                        newMods[idx].nameEn = e.target.value;
+                        setEditingProduct({...editingProduct, modifiers: newMods});
+                      }} /></div>
+                      <div className="md:col-span-1"><label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">الاسم AR</label><input dir="rtl" className={inputStyle + " h-10 text-xs font-arabic"} value={mod.nameAr} onChange={e => {
+                        const newMods = [...(editingProduct.modifiers || [])];
+                        newMods[idx].nameAr = e.target.value;
+                        setEditingProduct({...editingProduct, modifiers: newMods});
+                      }} /></div>
+                      <div className="md:col-span-1"><label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Price</label><input type="number" className={inputStyle + " h-10 text-xs"} value={mod.price} onChange={e => {
+                        const newMods = [...(editingProduct.modifiers || [])];
+                        newMods[idx].price = Number(e.target.value);
+                        setEditingProduct({...editingProduct, modifiers: newMods});
+                      }} /></div>
+                      <div className="md:col-span-1 flex justify-end"><button type="button" onClick={() => {
+                        const newMods = editingProduct.modifiers?.filter((_, i) => i !== idx);
+                        setEditingProduct({...editingProduct, modifiers: newMods});
+                      }} className="p-2 text-red-500 hover:text-red-700 bg-red-50 rounded-lg"><X size={20} /></button></div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {editingProduct.hasSizes && (

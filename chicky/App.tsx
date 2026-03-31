@@ -10,7 +10,7 @@ import AdminAuthModal from './components/AdminAuthModal';
 import Footer from './components/Footer';
 import WhatsAppFloat from './components/WhatsAppFloat';
 import { getStoredMenu, saveMenuToStorage, getStoredConfig, saveConfigToStorage } from './data/menuData';
-import { Product, CartItem, Language, OrderDetails, SiteConfig } from './types';
+import { Product, CartItem, Language, OrderDetails, SiteConfig, ServiceType, PromoCode } from './types';
 import { supabase } from './lib/supabase';
 // Added Search to the lucide-react imports
 import { ArrowRight, Sparkles, Zap, Tag, Tag as TagIcon, X, Search, Flame } from 'lucide-react';
@@ -24,6 +24,9 @@ const App: React.FC = () => {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isAdminAuthOpen, setIsAdminAuthOpen] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [serviceType, setServiceType] = useState<ServiceType>('delivery');
+  const [promoCode, setPromoCode] = useState<PromoCode | null>(null);
+  const [scheduledTime, setScheduledTime] = useState<string | null>(null);
 
   const [activeCategory, setActiveCategory] = useState<string>(config.layout[0]?.id || 'cat_deals');
   const [lang, setLang] = useState<Language>('ar'); 
@@ -44,33 +47,55 @@ const App: React.FC = () => {
   }, [config.hero.banners.length]);
 
   useEffect(() => {
-    // 1. Fetch Menu Items (Live Data)
-    const fetchMenu = async () => {
-      const { data, error } = await supabase
-        .from('menu_items')
-        .select('*');
-      
-      if (!error && data) {
-        setMenu(data as Product[]);
+    const fetchData = async () => {
+      try {
+        // 1. Fetch Menu Items
+        const { data: menuData, error: menuError } = await supabase
+          .from('menu_items')
+          .select('*')
+          .order('created_at', { ascending: true });
+        
+        if (!menuError && menuData) {
+          setMenu(menuData);
+        }
+
+        // 2. Fetch Site Config
+        const { data: configData, error: configError } = await supabase
+          .from('site_settings')
+          .select('config_data')
+          .eq('id', 'active_config')
+          .single();
+        
+        if (!configError && configData?.config_data) {
+          setConfig(configData.config_data as SiteConfig);
+        }
+      } catch (err) {
+        console.error('Initial fetch failed:', err);
       }
     };
 
-    // 2. Fetch Site Config
-    const fetchConfig = async () => {
-      const { data, error } = await supabase
-        .from('site_settings')
-        .select('config_data')
-        .eq('id', 'active_config')
-        .single();
-      
-      if (!error && data) {
-        setConfig(data.config_data as SiteConfig);
-      }
+    fetchData();
+
+    // 3. Real-time Subscription for Site Settings
+    const channel = supabase
+      .channel('site_settings_changes')
+      .on('postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'site_settings', filter: 'id=eq.active_config' }, 
+        (payload) => {
+          if (payload.new && payload.new.config_data) {
+            setConfig(payload.new.config_data as SiteConfig);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
+  }, []);
 
-    fetchMenu();
-    fetchConfig();
-
+  // Update document properties when config or language changes
+  useEffect(() => {
     document.documentElement.style.setProperty('--brand-red', config.theme.primaryColor);
     document.documentElement.dir = isAr ? 'rtl' : 'ltr';
     
@@ -79,41 +104,13 @@ const App: React.FC = () => {
     link.type = 'image/png';
     link.rel = 'shortcut icon';
     link.href = config.header.logoRed;
-    document.getElementsByTagName('head')[0].appendChild(link);
+    if (!document.querySelector("link[rel*='icon']")) {
+       document.getElementsByTagName('head')[0].appendChild(link);
+    }
     
     // Update Title
     document.title = isAr ? 'تشيكي فرايد تشيكن | أقوى فرايد تشيكن' : 'Chicky Fried Chicken | Egypt\'s #1';
   }, [config.theme.primaryColor, isAr, config.header.logoRed]);
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch Menu
-        const { data: menuData, error: menuError } = await supabase
-          .from('menu_items')
-          .select('*')
-          .order('created_at', { ascending: true });
-        
-        if (!menuError && menuData && menuData.length > 0) {
-          setMenu(menuData);
-        }
-
-        // Fetch Config
-        const { data: configData, error: configError } = await supabase
-          .from('site_settings')
-          .select('config_data')
-          .eq('id', 'active_config')
-          .single();
-        
-        if (!configError && configData?.config_data) {
-          setConfig(configData.config_data);
-        }
-      } catch (err) {
-        console.error('Initial fetch failed:', err);
-      }
-    };
-
-    fetchData();
-  }, []);
 
   const updateMenu = (newMenu: Product[]) => {
     setMenu(newMenu);
@@ -160,11 +157,11 @@ const App: React.FC = () => {
     return isAr ? 'قد يعجبك أيضاً' : 'YOU MIGHT ALSO LIKE';
   }, [cart, isAr]);
 
-  const addToCart = (product: Product, spiciness?: 'Normal' | 'Spicy') => {
-    // Note: The product passed here may already have its price adjusted by the size selection in MenuSection
-    // We should also ensure the selected size ID is part of the identity for cart merging
-    
-    // Phase 3: Add to cart animation
+  const addToCart = (product: Product, spiciness?: 'Normal' | 'Spicy', size?: any, modifiers?: any[]) => {
+    const modifierTotal = (modifiers || []).reduce((acc, m) => acc + m.price, 0);
+    const basePrice = size ? size.price : product.price;
+    const finalPrice = basePrice + modifierTotal;
+
     const cartBtn = document.getElementById('cart-btn');
     if (cartBtn) {
       cartBtn.classList.add('animate-bounce');
@@ -172,27 +169,42 @@ const App: React.FC = () => {
     }
 
     setCart(prev => {
-      // Find matching item by ID AND Spiciness AND Price (which reflects Size)
+      // Find matching item by ID, Spiciness, Size ID, and Modifiers (simplified comparison)
       const existing = prev.find(item => 
         item.id === product.id && 
         item.selectedSpiciness === spiciness && 
-        item.price === product.price
+        item.selectedSize?.id === size?.id &&
+        JSON.stringify(item.selectedModifiers || []) === JSON.stringify(modifiers || [])
       );
 
       if (existing) {
         return prev.map(item => 
-          (item.id === product.id && item.selectedSpiciness === spiciness && item.price === product.price) 
+          (item.id === product.id && 
+           item.selectedSpiciness === spiciness && 
+           item.selectedSize?.id === size?.id &&
+           JSON.stringify(item.selectedModifiers || []) === JSON.stringify(modifiers || [])) 
           ? { ...item, quantity: item.quantity + 1 } 
           : item
         );
       }
-      return [...prev, { ...product, quantity: 1, selectedSpiciness: spiciness }];
+      return [...prev, { 
+        ...product, 
+        price: finalPrice, 
+        quantity: 1, 
+        selectedSpiciness: spiciness, 
+        selectedSize: size, 
+        selectedModifiers: modifiers 
+      }];
     });
   };
 
-  const updateQuantity = (id: string, delta: number, spiciness?: 'Normal' | 'Spicy', price?: number) => {
+  const updateQuantity = (id: string, delta: number, spiciness?: 'Normal' | 'Spicy', price?: number, sizeId?: string, modifiersJson?: string) => {
     setCart(prev => prev.map(item => {
-      if (item.id === id && item.selectedSpiciness === spiciness && (price === undefined || item.price === price)) {
+      if (item.id === id && 
+          item.selectedSpiciness === spiciness && 
+          (price === undefined || item.price === price) &&
+          (sizeId === undefined || item.selectedSize?.id === sizeId) &&
+          (modifiersJson === undefined || JSON.stringify(item.selectedModifiers || []) === modifiersJson)) {
         const newQty = Math.max(1, item.quantity + delta);
         return { ...item, quantity: newQty };
       }
@@ -370,7 +382,17 @@ const App: React.FC = () => {
       <WhatsAppFloat phone={config.header.phone} lang={lang} />
 
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} items={cart} onUpdateQuantity={updateQuantity} onRemove={removeFromCart} onCheckout={() => { setIsCartOpen(false); setIsCheckoutOpen(true); }} lang={lang} />
-      <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} subtotal={cartSubtotal} onConfirm={handleConfirmOrder} cartItems={cart} onClearCart={() => setCart([])} lang={lang} />
+      <CheckoutModal 
+        isOpen={isCheckoutOpen} 
+        onClose={() => setIsCheckoutOpen(false)} 
+        subtotal={cartSubtotal} 
+        onConfirm={handleConfirmOrder} 
+        cartItems={cart} 
+        onClearCart={() => setCart([])} 
+        lang={lang} 
+        serviceType={serviceType || 'delivery'}
+        config={config}
+      />
 
       <AdminAuthModal isOpen={isAdminAuthOpen} onClose={() => setIsAdminAuthOpen(false)} onAuthenticated={handleAdminAuthenticated} />
       <AdminDashboard isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} menu={menu} onUpdateMenu={updateMenu} config={config} onUpdateConfig={updateConfig} />
