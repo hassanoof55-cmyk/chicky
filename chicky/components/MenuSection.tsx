@@ -139,6 +139,8 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
                 <img 
                   src={item.image} 
                   alt={lang === 'en' ? item.name : item.nameAr} 
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-700" 
                 />
                 

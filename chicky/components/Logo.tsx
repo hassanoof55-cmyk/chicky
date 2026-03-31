@@ -14,6 +14,8 @@ const Logo: React.FC<LogoProps> = ({ className = "h-10", src }) => {
       <img 
         src={src || fallback} 
         alt="Chicky Logo"
+        fetchPriority="high"
+        decoding="async"
         className="h-full w-auto object-contain transition-transform hover:scale-105"
         onError={(e) => {
           const target = e.target as HTMLImageElement;

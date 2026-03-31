@@ -282,9 +282,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const syncConfig = async (newConfig: SiteConfig) => {
     onUpdateConfig(newConfig);
     try {
-      await supabase.from('site_settings').upsert({ id: 'active_config', config_data: newConfig });
-    } catch (err) {
-      console.error('Failed to sync config:', err);
+      const { error } = await supabase
+        .from('site_settings')
+        .upsert({ 
+          id: 'active_config', 
+          config_data: newConfig
+        });
+
+      if (error) {
+        console.error('Supabase Sync Error:', error);
+        alert('Failed to sync changes to Supabase: ' + error.message);
+      } else {
+        console.log('Successfully synced to Supabase');
+      }
+    } catch (err: any) {
+      console.error('Config sync failed:', err);
+      alert('Network error while saving to cloud.');
     }
   };
 
@@ -818,7 +831,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                             <button onClick={() => { setDrawingMode(false); setCurrentPolygonPoints([]); ghostLayerRef.current?.clearLayers(); }}
                               className="bg-white/5 text-white/60 font-black py-4 rounded-2xl hover:bg-white/10 transition-all uppercase text-[10px] tracking-widest">Discard</button>
                             <button disabled={currentPolygonPoints.length < 3 || !newArea.nameEn || !newArea.nameAr}
-                              onClick={() => { syncConfig({ ...config, areas: [...config.areas, { id: 'a' + Date.now(), ...newArea, points: currentPolygonPoints } as Area] }); setDrawingMode(false); setCurrentPolygonPoints([]); refreshExistingZones(); }}
+                              onClick={() => { 
+                                syncConfig({ 
+                                  ...config, 
+                                  areas: [...(config.areas || []), { id: 'a' + Date.now(), ...newArea, points: currentPolygonPoints } as Area] 
+                                }); 
+                                setDrawingMode(false); 
+                                setCurrentPolygonPoints([]); 
+                                setNewArea({ nameEn: '', nameAr: '', fee: 0 }); // Reset form
+                                refreshExistingZones(); 
+                              }}
                               className="bg-red-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-red-900/40 transition-all uppercase text-[10px] tracking-widest disabled:opacity-20 flex items-center justify-center gap-2">
                               <Check size={16} strokeWidth={4} /> Save Zone
                             </button>

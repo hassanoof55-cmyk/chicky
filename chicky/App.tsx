@@ -291,7 +291,12 @@ const App: React.FC = () => {
                 </div>
               </div>
               <div className="relative flex items-center justify-center h-full">
-                 <img src={activeBanner.image} className="relative w-full max-w-2xl object-contain drop-shadow-[0_60px_100px_rgba(0,0,0,0.9)] animate-float" />
+                 <img 
+                   src={activeBanner.image} 
+                   fetchPriority="high"
+                   decoding="async"
+                   className="relative w-full max-w-2xl object-contain drop-shadow-[0_60px_100px_rgba(0,0,0,0.9)] animate-float" 
+                 />
               </div>
             </div>
           )}
