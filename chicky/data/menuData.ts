@@ -66,6 +66,38 @@ export const INITIAL_MENU_DATA: Product[] = [
       { id: 'jalapeno', nameEn: 'Jalapeno', nameAr: 'هالبينو', price: 10 },
       { id: 'ranch', nameEn: 'Ranch Sauce', nameAr: 'صوص رانش', price: 20 }
     ]
+  },
+  {
+    id: 'f1',
+    name: 'Family Bucket',
+    nameAr: 'باكيت العائلة',
+    price: 650,
+    category: 'family-meals',
+    description: '12 Pieces + Large Fries + 2 Coleslaw + 4 Buns + 1.5L Cola',
+    descriptionAr: '١٢ قطعة + بطاطس كبير + ٢ كول سلو + ٤ خبز + ١.٥ لتر كولا',
+    image: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?auto=format&fit=crop&q=80&w=400',
+    tags: ['Best Seller']
+  },
+  {
+    id: 's1',
+    name: 'Coleslaw',
+    nameAr: 'كول سلو',
+    price: 35,
+    category: 'sides',
+    description: 'Fresh and creamy cabbage salad',
+    descriptionAr: 'سلطة كرنب طازجة وكريمية',
+    image: 'https://images.unsplash.com/photo-1570145820259-b5b80c5c8bd6?auto=format&fit=crop&q=80&w=400'
+  },
+  {
+    id: 'k1',
+    name: 'Junior Meal',
+    nameAr: 'وجبة الصغار',
+    price: 120,
+    category: 'kids',
+    description: '1 Piece + Small Fries + Juice + Toy',
+    descriptionAr: '١ قطعة + بطاطس صغير + عصير + لعبة',
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&q=80&w=400',
+    tags: ['For Kids']
   }
 ];
 
@@ -99,7 +131,7 @@ export const INITIAL_SITE_CONFIG: SiteConfig = {
     facebook: 'https://facebook.com/chicky',
     instagram: 'https://instagram.com/chicky',
     tiktok: 'https://tiktok.com/@chicky',
-    locationUrl: 'https://goo.gl/maps/example',
+    locationUrl: 'https://maps.app.goo.gl/R49XXYqwM6vzEf469',
     addressEn: 'Palm Beach, St 14 corner 29, El Agamy El Bahria, Egypt',
     addressAr: 'شاطئ النخيل شارع ١٤ مع ٢٩، العجمي البحرية، الإسكندرية',
     copyrightEn: '© 2024 Hassan Mohamed',

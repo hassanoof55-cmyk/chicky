@@ -10,3 +10,17 @@ body {
   background-color: #fcfcfc;
   -webkit-tap-highlight-color: transparent;
 }
+
+@keyframes grow {
+  0% { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
+
+.animate-progress {
+  transform-origin: left;
+  animation: grow 5s linear forwards;
+}
+
+[dir="rtl"] .animate-progress {
+  transform-origin: right;
+}

@@ -64,7 +64,7 @@ const Footer: React.FC<FooterProps> = ({ config, lang, onOpenAdmin, scrollToCate
           </h4>
           <div className="space-y-6">
             <a 
-              href={config.footer.locationUrl} 
+              href="https://maps.app.goo.gl/R49XXYqwM6vzEf469" 
               target="_blank" 
               rel="noopener noreferrer" 
               className="flex items-start gap-4 group hover:bg-white/5 p-2 -m-2 rounded-2xl transition-all"
@@ -74,15 +74,18 @@ const Footer: React.FC<FooterProps> = ({ config, lang, onOpenAdmin, scrollToCate
                 {isAr ? config.footer.addressAr : config.footer.addressEn}
               </p>
             </a>
-            <div className="flex items-center gap-4 group">
+            <a 
+              href={`tel:${config.header.phone}`}
+              className="flex items-center gap-4 group cursor-pointer"
+            >
               <div className="w-14 h-14 bg-red-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-red-600/30 group-hover:scale-110 transition-all">
                 <Phone size={26} className="text-white" />
               </div>
               <div className={isAr ? 'text-right' : 'text-left'}>
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1">HOTLINE</span>
-                <p className="text-3xl font-black tracking-tighter text-white">{config.header.phone}</p>
+                <p className="text-3xl font-black tracking-tighter text-white hover:text-red-500 transition-colors">{config.header.phone}</p>
               </div>
-            </div>
+            </a>
           </div>
         </div>
 

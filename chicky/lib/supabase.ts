@@ -29,11 +29,14 @@ export const supabase = (() => {
   const mock: any = {
     from: () => mock,
     select: () => mock,
-    single: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
+    order: () => mock,
     eq: () => mock,
+    match: () => mock,
+    single: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
     on: () => mock,
     subscribe: () => ({ unsubscribe: () => {} }),
     channel: () => mock,
+    removeChannel: () => {},
     storage: { 
       from: () => ({ 
         upload: () => Promise.resolve({ error: new Error('Supabase not configured') }), 

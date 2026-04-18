@@ -713,18 +713,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                           <div key={b.id} className="bg-white p-10 rounded-[3.5rem] border-2 border-slate-50 flex flex-col md:flex-row items-center justify-between shadow-sm group hover:border-red-600 transition-all">
                             <div className="flex flex-col md:flex-row items-center gap-10">
                               <div className="relative shrink-0">
-                                <img src={b.image} className="w-48 h-32 object-contain rounded-3xl bg-slate-50 p-4 shadow-inner" />
-                                <div className="absolute -top-4 -right-4 bg-red-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl border-4 border-white">
-                                  {b.offerPrice} LE
-                                </div>
+                                <img src={b.image} className="w-64 h-32 object-cover rounded-3xl bg-slate-50 shadow-inner border" />
                               </div>
                               <div className="text-center md:text-left">
-                                <h5 className="font-black text-2xl text-slate-900 uppercase leading-none mb-2">{b.titleEn}</h5>
-                                <p className="text-sm font-bold text-red-600 flex items-center gap-2 justify-center md:justify-start">
-                                  {b.offerLabelEn}
-                                  {b.originalPrice && b.originalPrice > b.offerPrice && (
-                                    <span className="text-slate-300 text-[9px] line-through uppercase">بدلاً من {b.originalPrice} LE</span>
-                                  )}
+                                <h5 className="font-black text-xl text-slate-900 uppercase leading-none mb-2">Campaign Slide</h5>
+                                <p className="text-xs font-bold text-red-600 flex items-center gap-2 justify-center md:justify-start">
+                                  Linked to: {config.layout.find(c => c.id === b.targetCategoryId)?.nameEn || 'No Link'}
                                 </p>
                               </div>
                             </div>
@@ -834,6 +828,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                           <div className="relative"><Facebook className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-600" size={24} /><input className={inputStyle + " pl-16"} value={config.footer.facebook} placeholder="Facebook Link" onChange={e => syncConfig({ ...config, footer: { ...config.footer, facebook: e.target.value } })} /></div>
                           <div className="relative"><Instagram className="absolute left-5 top-1/2 -translate-y-1/2 text-pink-600" size={24} /><input className={inputStyle + " pl-16"} value={config.footer.instagram} placeholder="Instagram Link" onChange={e => syncConfig({ ...config, footer: { ...config.footer, instagram: e.target.value } })} /></div>
                           <div className="relative"><TikTokIcon size={24} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-900" /><input className={inputStyle + " pl-16"} value={config.footer.tiktok} placeholder="TikTok Link" onChange={e => syncConfig({ ...config, footer: { ...config.footer, tiktok: e.target.value } })} /></div>
+                          <div className="relative md:col-span-3">
+                            <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-red-600" size={24} />
+                            <input 
+                              className={inputStyle + " pl-16"} 
+                              value={config.footer.locationUrl || ''} 
+                              placeholder="Google Maps Location URL" 
+                              onChange={e => syncConfig({ ...config, footer: { ...config.footer, locationUrl: e.target.value } })} 
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1169,19 +1172,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
               <div className="flex justify-between items-center mb-4 py-6 border-b-4 border-slate-50"><h3 className="text-4xl font-black brand-font text-slate-900 uppercase leading-none">Slider Offer Setup</h3><button type="button" onClick={() => setIsBannerFormOpen(false)} className="text-slate-300 hover:text-red-600 transition-all"><X size={48} /></button></div>
               <div className="space-y-4"><label className={labelStyle}>Banner Image (PNG Preferred)</label><div onClick={() => bannerFileInputRef.current?.click()} className="relative w-full h-72 border-4 border-dashed rounded-[3rem] flex flex-col items-center justify-center cursor-pointer bg-slate-50 overflow-hidden hover:border-red-600 shadow-inner group">{editingBanner.image ? <img src={editingBanner.image} className="h-full object-contain p-10 group-hover:scale-105 transition-transform" /> : <Upload size={64} className="text-slate-200" />}<input type="file" ref={bannerFileInputRef} className="hidden" accept="image/*" onChange={(e) => e.target.files && handleFile(e.target.files[0], 'banner')} /></div></div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-6">
-                <div className="space-y-10">
-                  <div><label className={labelStyle}>Headline (EN)</label><input className={inputStyle} value={editingBanner.titleEn} onChange={e => setEditingBanner({ ...editingBanner, titleEn: e.target.value })} required /></div>
-                  <div><label className={labelStyle}>العنوان (AR)</label><input dir="rtl" className={inputStyle + " font-arabic"} value={editingBanner.titleAr} onChange={e => setEditingBanner({ ...editingBanner, titleAr: e.target.value })} required /></div>
-                  <div><label className={labelStyle}>Subtitle (EN)</label><input className={inputStyle} value={editingBanner.subtitleEn} placeholder="e.g. Dinner Box" onChange={e => setEditingBanner({ ...editingBanner, subtitleEn: e.target.value })} required /></div>
-                  <div><label className={labelStyle}>العنوان الفرعي (AR)</label><input dir="rtl" className={inputStyle + " font-arabic"} value={editingBanner.subtitleAr} placeholder="مثال: بوكس العشاء" onChange={e => setEditingBanner({ ...editingBanner, subtitleAr: e.target.value })} required /></div>
+                <div className="space-y-6">
+                   <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100">
+                     <div className="flex items-center gap-3 text-blue-800 mb-2">
+                       <Info size={18} />
+                       <span className="text-[10px] font-black uppercase tracking-widest">Image Content Only</span>
+                     </div>
+                     <p className="text-xs font-medium text-blue-600 leading-relaxed">
+                       This slider uses pre-designed images. Any text or prices should be included directly in the image design.
+                     </p>
+                   </div>
                 </div>
                 <div className="space-y-10">
-                  <div className="grid grid-cols-2 gap-8">
-                    <div><label className={labelStyle}>Offer Price</label><input type="number" className={inputStyle + " text-4xl text-red-600 font-black"} value={editingBanner.offerPrice} onChange={e => setEditingBanner({ ...editingBanner, offerPrice: Number(e.target.value) })} required /></div>
-                    <div><label className={labelStyle}>Instead of</label><input type="number" className={inputStyle + " text-2xl text-slate-300 font-bold"} value={editingBanner.originalPrice || ''} onChange={e => setEditingBanner({ ...editingBanner, originalPrice: Number(e.target.value) })} /></div>
+                  <div>
+                    <label className={labelStyle}>Link to Category</label>
+                    <select 
+                      className={inputStyle + " h-20 text-xl"} 
+                      value={editingBanner.targetCategoryId || ''} 
+                      onChange={e => setEditingBanner({ ...editingBanner, targetCategoryId: e.target.value })}
+                    >
+                      <option value="">No Link (Visual Only)</option>
+                      {config.layout.map(c => <option key={c.id} value={c.id}>{c.nameEn} / {c.nameAr}</option>)}
+                    </select>
+                    <p className="mt-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest">When a customer clicks this banner, they will be scrolled to this category.</p>
                   </div>
-                  <div><label className={labelStyle}>Short Label (EN)</label><input className={inputStyle} value={editingBanner.offerLabelEn} placeholder="e.g. MEGA SAVER" onChange={e => setEditingBanner({ ...editingBanner, offerLabelEn: e.target.value })} required /></div>
-                  <div><label className={labelStyle}>Link to Category</label><select className={inputStyle} value={editingBanner.targetCategoryId || ''} onChange={e => setEditingBanner({ ...editingBanner, targetCategoryId: e.target.value })}><option value="">Default (First Category)</option>{config.layout.map(c => <option key={c.id} value={c.id}>{c.nameEn}</option>)}</select></div>
                 </div>
               </div>
               <button type="submit" className="w-full py-10 font-black uppercase text-2xl tracking-[0.4em] bg-slate-900 text-white rounded-[3rem] shadow-2xl hover:bg-red-600 transition-all flex items-center justify-center gap-8 active:scale-95"><Sparkles size={32} /> DEPLOY CAMPAIGN</button>

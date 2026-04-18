@@ -9,6 +9,7 @@ import AdminDashboard from './components/AdminDashboard';
 import AdminAuthModal from './components/AdminAuthModal';
 import Footer from './components/Footer';
 import WhatsAppFloat from './components/WhatsAppFloat';
+import HeroCarousel from './components/HeroCarousel';
 import { getStoredMenu, saveMenuToStorage, getStoredConfig, saveConfigToStorage } from './data/menuData';
 import { Product, CartItem, Language, OrderDetails, SiteConfig, ServiceType, PromoCode } from './types';
 import { supabase } from './lib/supabase';
@@ -32,19 +33,11 @@ const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('ar'); 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
 
   const isAr = lang === 'ar';
 
 
 
-  useEffect(() => {
-    if (config.hero.banners.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentBannerIdx(prev => (prev + 1) % config.hero.banners.length);
-    }, 8000);
-    return () => clearInterval(interval);
-  }, [config.hero.banners.length]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -253,66 +246,12 @@ const App: React.FC = () => {
     setIsAdminOpen(true);
   };
 
-  const activeBanner = config.hero.banners[currentBannerIdx] || config.hero.banners[0];
-
   return (
     <div className={`min-h-screen ${isAr ? 'font-arabic' : ''}`} dir={isAr ? 'rtl' : 'ltr'}>
       <Navbar lang={lang} onSetLang={setLang} onOpenCart={() => setIsCartOpen(true)} cartCount={cartCount} onSearchChange={setSearchQuery} logoSrc={config.header.logoRed} tags={config.tags} activeTag={activeTag} onTagToggle={handleTagToggle} filterLabelEn={config.filterLabelEn} filterLabelAr={config.filterLabelAr} />
       
       {!activeTag && !searchQuery && (
-        <section className="relative h-[85vh] md:h-[95vh] overflow-hidden bg-slate-950 flex items-center">
-          <div className="absolute inset-0 z-0">
-            <div className={`absolute inset-0 bg-gradient-to-${isAr ? 'l' : 'r'} from-slate-950 via-slate-950/40 to-transparent z-10`} />
-            <div className="absolute inset-0 opacity-20 bg-stripes animate-pulse" style={{ backgroundColor: config.theme.primaryColor }} />
-          </div>
-          {activeBanner && (
-            <div key={activeBanner.id} className="container mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 gap-12 items-center relative z-20 h-full">
-              <div className={`space-y-10 text-center ${isAr ? 'md:text-right' : 'md:text-left'} animate-reveal`}>
-                <div className="space-y-6">
-                   {(activeBanner.promoTagEn || activeBanner.promoTagAr) && (
-                     <div className={`w-fit mx-auto ${isAr ? 'md:mr-0 md:ml-auto' : 'md:ml-0 md:mr-auto'} flex items-center gap-3 bg-white text-slate-900 px-6 py-2.5 rounded-full text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl border-4 border-slate-950 animate-bounce`}>
-                       <Sparkles size={14} className="text-yellow-500" fill="currentColor" />
-                       {isAr ? activeBanner.promoTagAr : activeBanner.promoTagEn}
-                     </div>
-                   )}
-                   <h1 className={`text-6xl sm:text-8xl md:text-[140px] font-black ${isAr ? 'font-arabic leading-[1.2]' : 'brand-font leading-[0.75]'} tracking-tight text-white uppercase`}>
-                     {isAr ? activeBanner.titleAr : activeBanner.titleEn}
-                   </h1>
-                   
-                   <div className="flex flex-col gap-4">
-                      <p className="text-xl md:text-3xl font-medium text-slate-300 max-w-2xl mx-auto md:mx-0 leading-tight">
-                        {isAr ? activeBanner.offerLabelAr : activeBanner.offerLabelEn}
-                      </p>
-                      <div className="flex items-center gap-6 justify-center md:justify-start">
-                         <span className="text-5xl md:text-7xl font-black text-red-600 drop-shadow-2xl">
-                            {activeBanner.offerPrice} <span className="text-2xl opacity-80 uppercase">{isAr ? 'ج.م' : 'LE'}</span>
-                         </span>
-                         {activeBanner.originalPrice && activeBanner.originalPrice > activeBanner.offerPrice && (
-                            <div className="flex flex-col items-start leading-none">
-                               <span className="text-slate-400 text-sm font-black uppercase tracking-widest mb-1">{isAr ? 'بدلاً من' : 'Instead of'}</span>
-                               <span className="text-slate-500 text-3xl font-black line-through">{activeBanner.originalPrice}</span>
-                            </div>
-                         )}
-                      </div>
-                   </div>
-                </div>
-                <div className="flex flex-col sm:flex-row items-center gap-10 pt-4 justify-center md:justify-start">
-                   <button onClick={() => scrollToCategory(activeBanner.targetCategoryId || config.layout[0]?.id || '')} className="group relative bg-red-600 text-white font-black px-12 py-6 rounded-[2rem] shadow-2xl hover:-translate-y-2 active:scale-95 transition-all text-xl tracking-widest uppercase">
-                     <span className="relative z-10 flex items-center gap-4">{isAr ? 'اطلب الآن' : 'ORDER THE DEAL'} <ArrowRight size={28} className={isAr ? 'rotate-180' : ''} /></span>
-                   </button>
-                </div>
-              </div>
-              <div className="relative flex items-center justify-center h-full">
-                 <img 
-                   src={activeBanner.image} 
-                   fetchPriority="high"
-                   decoding="async"
-                   className="relative w-full max-w-2xl object-contain drop-shadow-[0_60px_100px_rgba(0,0,0,0.9)] animate-float" 
-                 />
-              </div>
-            </div>
-          )}
-        </section>
+        <HeroCarousel banners={config.hero.banners} isAr={isAr} onCategoryClick={scrollToCategory} />
       )}
 
 
