@@ -10,6 +10,7 @@ import AdminAuthModal from './components/AdminAuthModal';
 import Footer from './components/Footer';
 import WhatsAppFloat from './components/WhatsAppFloat';
 import HeroCarousel from './components/HeroCarousel';
+import MobileBottomNav from './components/MobileBottomNav';
 import { getStoredMenu, saveMenuToStorage, getStoredConfig, saveConfigToStorage } from './data/menuData';
 import { Product, CartItem, Language, OrderDetails, SiteConfig, ServiceType, PromoCode } from './types';
 import { supabase } from './lib/supabase';
@@ -33,6 +34,7 @@ const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('ar'); 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
 
   const isAr = lang === 'ar';
 
@@ -247,15 +249,30 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen ${isAr ? 'font-arabic' : ''}`} dir={isAr ? 'rtl' : 'ltr'}>
+    <div className={`min-h-screen bg-mesh ${isAr ? 'font-arabic' : ''}`} dir={isAr ? 'rtl' : 'ltr'}>
       <Navbar lang={lang} onSetLang={setLang} onOpenCart={() => setIsCartOpen(true)} cartCount={cartCount} onSearchChange={setSearchQuery} logoSrc={config.header.logoRed} tags={config.tags} activeTag={activeTag} onTagToggle={handleTagToggle} filterLabelEn={config.filterLabelEn} filterLabelAr={config.filterLabelAr} />
       
       {!activeTag && !searchQuery && (
         <HeroCarousel banners={config.hero.banners} isAr={isAr} onCategoryClick={scrollToCategory} />
       )}
 
+      {isMobileSearchOpen && (
+        <div className="md:hidden sticky top-[140px] z-[45] px-4 py-4 animate-reveal glass border-b border-slate-100">
+          <div className="relative w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <input
+              autoFocus
+              type="text"
+              placeholder={isAr ? "عن ماذا تبحث؟" : "Search items..."}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-100 border-2 border-transparent rounded-[1.5rem] py-3 pl-12 pr-4 focus:bg-white focus:border-red-500 outline-none transition-all text-base font-bold text-slate-900"
+            />
+          </div>
+        </div>
+      )}
 
-      <main className="max-w-7xl mx-auto px-6 md:px-12 py-16">
+      <main className="max-w-7xl mx-auto px-6 md:px-12 py-16 mb-24 md:mb-0">
         
         {/* ACTIVE FILTER HEADER */}
         {(activeTag || searchQuery) && (
@@ -291,7 +308,15 @@ const App: React.FC = () => {
                 const hasItems = filteredMenu.some(p => p.category === cat.id);
                 if (!hasItems) return null;
                 return (
-                  <button key={cat.id} onClick={() => scrollToCategory(cat.id)} className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border-2 ${activeCategory === cat.id ? 'bg-red-600 border-red-600 text-white shadow-xl scale-105' : 'bg-white border-slate-100 text-slate-500 hover:text-red-600'}`}>
+                  <button 
+                    key={cat.id} 
+                    onClick={() => scrollToCategory(cat.id)} 
+                    className={`px-7 py-3 rounded-[1.25rem] text-[11px] md:text-xs font-black uppercase tracking-wider transition-all border-2 ${
+                      activeCategory === cat.id 
+                        ? 'bg-red-600 border-red-600 text-white shadow-xl scale-105' 
+                        : 'bg-white border-gray-100 text-slate-500 hover:text-red-600 hover:border-red-100'
+                    }`}
+                  >
                     {isAr ? cat.nameAr : cat.nameEn}
                   </button>
                 );
@@ -319,6 +344,14 @@ const App: React.FC = () => {
 
       <Footer config={config} lang={lang} onOpenAdmin={handleOpenAdmin} scrollToCategory={scrollToCategory} />
       <WhatsAppFloat phone={config.header.phone} lang={lang} />
+      <MobileBottomNav 
+        onOpenCart={() => setIsCartOpen(true)} 
+        cartCount={cartCount} 
+        lang={lang} 
+        onHomeClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
+        onSearchClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
+        onMenuClick={() => scrollToCategory(config.layout[0]?.id)}
+      />
 
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} items={cart} onUpdateQuantity={updateQuantity} onRemove={removeFromCart} onCheckout={() => { setIsCartOpen(false); setIsCheckoutOpen(true); }} lang={lang} />
       <CheckoutModal 

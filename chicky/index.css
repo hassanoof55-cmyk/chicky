@@ -1,19 +1,120 @@
-/* Using Tailwind Play CDN in index.html */
+/* Chicky Fried Chicken - Core Design System */
+
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&family=Cairo:wght@400;700;900&family=Changa:wght@400;700;800;900&display=swap');
 
 :root {
+  /* Brand Colors */
   --brand-red: #E4002B;
+  --brand-red-light: #FF1A46;
+  --brand-red-dark: #AF0021;
   --brand-dark: #0A0A0A;
+  --brand-gray: #f8fafc;
+  
+  /* Semantic Colors */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  --shadow-soft: 0 20px 40px -10px rgba(0,0,0,0.08);
+  --shadow-red: 0 20px 40px -10px rgba(228, 0, 43, 0.2);
+  
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  font-family: 'Inter', sans-serif;
-  background-color: #fcfcfc;
-  -webkit-tap-highlight-color: transparent;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--brand-gray);
+  color: var(--brand-dark);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+[dir="rtl"] body {
+  font-family: 'Cairo', sans-serif;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-red);
+}
+
+/* Typography Utilities */
+.brand-font {
+  font-family: 'Bebas Neue', cursive;
+  letter-spacing: 0.02em;
+}
+
+.font-arabic {
+  font-family: 'Cairo', sans-serif;
+}
+
+/* Animations */
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(30px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes pop {
+  0% { transform: scale(0.8); opacity: 0; }
+  70% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
 }
 
 @keyframes grow {
   0% { transform: scaleX(0); }
   100% { transform: scaleX(1); }
+}
+
+.animate-reveal {
+  animation: reveal 0.8s var(--transition-normal) forwards;
+}
+
+.animate-pop {
+  animation: pop 0.4s var(--transition-normal) forwards;
 }
 
 .animate-progress {
@@ -23,4 +124,82 @@ body {
 
 [dir="rtl"] .animate-progress {
   transform-origin: right;
+}
+
+/* Interactive Components */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.hover-lift {
+  transition: var(--transition-normal);
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: var(--shadow-red);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Button Styles */
+.btn-primary {
+  background: var(--brand-red);
+  color: white;
+  box-shadow: var(--shadow-md);
+  transition: var(--transition-normal);
+}
+
+.btn-primary:hover {
+  background: var(--brand-red-light);
+  box-shadow: var(--shadow-red);
+  transform: translateY(-2px);
+}
+
+.btn-primary:active {
+  transform: scale(0.95);
+}
+
+/* Image Utilities */
+.img-contain {
+  object-fit: contain;
+}
+
+/* Leaflet Map Fixes */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  border-radius: 2rem;
+  overflow: hidden;
+}
+
+.leaflet-control-attribution { 
+  display: none !important; 
+}
+
+/* Extra Premium Utilities */
+.text-balance {
+  text-wrap: balance;
+}
+
+.bg-mesh {
+  background-color: #ffffff;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(228, 0, 43, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(228, 0, 43, 0.02) 0px, transparent 50%);
+}
+
+.mask-edge {
+  mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
 }

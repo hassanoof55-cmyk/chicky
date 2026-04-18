@@ -69,17 +69,17 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ banners, isAr, onCategoryCl
 
   return (
     <section 
-      className="relative w-full px-4 md:px-8 mt-4 md:mt-6 group"
+      className="relative w-full max-w-7xl mx-auto px-3 md:px-8 mt-4 md:mt-8 group"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="relative w-full aspect-[4/3] sm:aspect-[16/7] md:aspect-[16/6] lg:aspect-[21/7] overflow-hidden bg-slate-100 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl shadow-slate-200/50 border-4 border-white">
+      <div className="relative w-full aspect-[16/8] sm:aspect-[16/7] md:aspect-[16/6] lg:aspect-[21/7] overflow-hidden bg-white rounded-[2rem] md:rounded-[3.5rem] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.15)] border-2 border-white/20">
         {/* Slider Container */}
         <div 
-          className="flex h-full transition-transform duration-1000 ease-[cubic-bezier(0.4,0,0.2,1)]"
+          className="flex h-full transition-transform duration-[1200ms] ease-[cubic-bezier(0.23,1,0.32,1)]"
           style={{ 
             transform: `translateX(${isAr ? currentIndex * (100 / banners.length) : -currentIndex * (100 / banners.length)}%)`,
             width: `${banners.length * 100}%`
@@ -88,7 +88,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ banners, isAr, onCategoryCl
           {banners.map((banner, idx) => (
             <div 
               key={banner.id} 
-              className={`h-full relative flex-shrink-0 ${banner.targetCategoryId ? 'cursor-pointer' : ''}`}
+              className={`h-full relative flex-shrink-0 overflow-hidden ${banner.targetCategoryId ? 'cursor-pointer' : ''}`}
               style={{ width: `${100 / banners.length}%` }}
               onClick={() => banner.targetCategoryId && onCategoryClick(banner.targetCategoryId)}
             >
@@ -99,23 +99,24 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ banners, isAr, onCategoryCl
                 loading={idx === 0 ? "eager" : "lazy"}
                 fetchPriority={idx === 0 ? "high" : "auto"}
               />
-              {/* Subtle Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+              {/* Refined Overlays */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10 pointer-events-none" />
+              <div className="absolute inset-0 bg-red-900/5 mix-blend-overlay pointer-events-none" />
             </div>
           ))}
         </div>
 
         {/* Pagination Dots */}
         {banners.length > 1 && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2.5 z-20">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
             {banners.map((_, idx) => (
               <button
                 key={idx}
                 onClick={() => goToSlide(idx)}
-                className={`group relative h-2.5 transition-all duration-300 rounded-full ${
+                className={`group relative h-1.5 transition-all duration-500 rounded-full ${
                   currentIndex === idx 
-                    ? 'w-10 bg-white shadow-xl scale-110' 
-                    : 'w-2.5 bg-white/40 hover:bg-white/70 shadow-sm'
+                    ? 'w-8 bg-white shadow-2xl' 
+                    : 'w-1.5 bg-white/30 hover:bg-white/60 hover:w-4'
                 }`}
                 aria-label={`Go to slide ${idx + 1}`}
               />
@@ -124,11 +125,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ banners, isAr, onCategoryCl
         )}
 
         {/* ProgressBar */}
-        <div className="absolute bottom-0 left-0 w-full h-1.5 bg-black/10 z-30">
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-black/10 z-30 overflow-hidden">
           {!isPaused && (
             <div 
               key={currentIndex}
-              className="h-full bg-red-600 animate-progress opacity-80"
+              className="h-full bg-red-600 animate-progress origin-left"
             />
           )}
         </div>

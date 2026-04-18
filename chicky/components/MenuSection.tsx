@@ -150,85 +150,88 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-8">
         {items.map((item) => {
           const isAnimating = animatingId?.startsWith(item.id);
 
           return (
             <div 
               key={item.id} 
-              className="group bg-white rounded-[2.5rem] overflow-hidden shadow-sm hover-lift border border-slate-100 flex flex-col relative"
+              className="group bg-white rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-soft hover-lift border border-slate-100/50 flex flex-col relative"
             >
-              <div className="relative h-56 overflow-hidden bg-white">
+              <div className="relative h-40 md:h-64 overflow-hidden bg-white p-3 md:p-6">
                 <img 
                    src={item.image} 
                    alt={lang === 'en' ? item.name : item.nameAr} 
                    loading="lazy"
                    decoding="async"
-                   className="w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-700" 
+                   className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700" 
                 />
-                <div className="absolute top-4 left-4 flex flex-col gap-2">
+                <div className="absolute top-3 md:top-6 left-3 md:left-6 flex flex-col gap-1 md:gap-2">
                   {item.tags?.map(tag => {
                     const tagObj = tagsConfig?.find(t => t.nameEn.toLowerCase() === tag.toLowerCase());
                     const displayName = isAr ? (tagObj?.nameAr || tag) : (tagObj?.nameEn || tag);
                     return (
-                      <span key={tag} className="bg-white/90 backdrop-blur-md text-red-600 text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg border border-white/20">
+                      <span key={tag} className="bg-white/95 backdrop-blur-md text-red-600 text-[8px] md:text-[10px] font-black px-2 md:px-4 py-1 md:py-2 rounded-lg md:rounded-xl uppercase tracking-widest shadow-lg border border-red-50/50">
                         {displayName}
                       </span>
                     );
                   })}
-                  {item.isSpicy && (
-                    <span className="bg-red-600/90 backdrop-blur-md text-white text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg flex items-center gap-2">
-                       <Flame size={10} fill="currentColor" /> {isAr ? 'حار' : 'SPICY'}
-                    </span>
-                  )}
                 </div>
-                <div className="absolute bottom-4 right-4 bg-slate-950/90 backdrop-blur-xl text-white px-5 py-2 rounded-full shadow-2xl border border-white/5 flex flex-col items-end">
+                
+                {/* Price Tag */}
+                <div className="absolute bottom-3 md:bottom-6 right-3 md:right-6 bg-slate-900/95 backdrop-blur-xl text-white px-3 md:px-5 py-1.5 md:py-2.5 rounded-xl md:rounded-2xl shadow-red border border-white/10 flex flex-col items-end">
                   {item.originalPrice !== undefined && item.originalPrice > item.price && item.originalPrice > 0 ? (
-                    <span className="text-[10px] text-white/20 leading-none mb-1 font-bold line-through">
+                    <span className="text-[8px] md:text-[10px] text-red-400 leading-none mb-0.5 md:mb-1 font-black line-through opacity-80 uppercase">
                        {item.originalPrice}
                     </span>
                   ) : null}
-                  <div className="flex items-baseline justify-end gap-2">
-                    <span className="text-[9px] font-black text-white/30 uppercase tracking-tighter">{lang === 'en' ? 'LE' : 'ج.م'}</span>
-                    <span className="text-2xl font-black leading-none text-white tracking-tight">
+                  <div className="flex items-baseline justify-end gap-1 md:gap-1.5">
+                    <span className="text-lg md:text-2xl font-black leading-none text-white tracking-tighter">
                       {item.price}
                     </span>
+                    <span className="text-[8px] md:text-[10px] font-black text-white/40 uppercase tracking-widest">{lang === 'en' ? 'LE' : 'ج.م'}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="p-7 flex-1 flex flex-col justify-between">
-                <div className="space-y-3 text-center md:text-left">
-                  <h3 className="font-black text-xl text-slate-900 leading-[1.1] group-hover:text-red-600 transition-colors uppercase brand-font tracking-tight">
-                    {lang === 'en' ? item.name : item.nameAr}
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">{lang === 'en' ? item.nameAr : item.name}</p>
-                  <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-2 min-h-[40px]">
+              <div className="px-4 md:px-8 pb-4 md:pb-8 pt-1 md:pt-2 flex-1 flex flex-col justify-between">
+                <div className="space-y-2 md:space-y-3">
+                  <div className="flex justify-between items-start gap-2 md:gap-4">
+                    <h3 className="font-black text-sm md:text-xl text-slate-900 leading-tight group-hover:text-red-600 transition-colors uppercase brand-font tracking-tight text-balance">
+                      {lang === 'en' ? item.name : item.nameAr}
+                    </h3>
+                    {item.isSpicy && (
+                      <div className="bg-red-50 text-red-600 p-1.5 md:p-2 rounded-lg md:rounded-xl shrink-0">
+                         <Flame size={14} md:size={16} fill="currentColor" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[8px] md:text-[9px] text-slate-300 font-black uppercase tracking-[0.2em] md:tracking-[0.3em]">{lang === 'en' ? item.nameAr : item.name}</p>
+                  <p className="text-[10px] md:text-xs text-slate-500 font-medium leading-relaxed line-clamp-2 opacity-80">
                     {lang === 'en' ? item.description : item.descriptionAr}
                   </p>
                 </div>
 
-                <button 
-                  onClick={() => handleAddClick(item)}
-                  className={`mt-8 w-full flex items-center justify-center gap-3 py-4 rounded-2xl transition-all font-black uppercase tracking-widest text-xs active:scale-95 border-2 ${
-                    isAnimating 
-                    ? 'bg-green-600 border-green-600 text-white shadow-xl shadow-green-100' 
-                    : 'bg-slate-50 border-transparent text-slate-900 group-hover:bg-red-600 group-hover:text-white group-hover:shadow-2xl group-hover:shadow-red-200'
-                  }`}
-                >
-                  {isAnimating ? (
-                    <>
-                      <CheckCircle size={18} />
-                      <span>{lang === 'en' ? 'DONE!' : 'تم!'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={18} />
-                      <span>{lang === 'en' ? 'ADD TO BASKET' : 'أضف للسلة'}</span>
-                    </>
-                  )}
-                </button>
+                <div className="mt-4 md:mt-8 flex gap-1 md:gap-2">
+                  <button 
+                    onClick={() => handleAddClick(item)}
+                    className={`flex-1 flex items-center justify-center gap-2 md:gap-3 py-2.5 md:py-4 rounded-xl md:rounded-2xl transition-all font-black uppercase tracking-widest text-[9px] md:text-[10px] active:scale-95 shadow-sm ${
+                      isAnimating 
+                      ? 'bg-success border-success text-white shadow-lg' 
+                      : 'bg-slate-50 border-transparent text-slate-900 group-hover:bg-red-600 group-hover:text-white'
+                    }`}
+                  >
+                    {isAnimating ? (
+                      <CheckCircle size={16} md:size={18} />
+                    ) : (
+                      <>
+                        <Plus size={16} md:size={18} strokeWidth={3} />
+                        <span>{lang === 'en' ? 'Add' : 'أضف'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           );
