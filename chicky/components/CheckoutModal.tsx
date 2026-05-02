@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, CheckCircle, Truck, MapPin, Phone, User, Loader2, AlertCircle, LayoutList, Map as MapIcon, ChevronRight, ChevronLeft, MessageSquare, Send, Navigation, ShoppingBag, Utensils, Clock, Tag, Sparkles, Search, Wallet, Coins, Smartphone, ArrowUp, LocateFixed } from 'lucide-react';
 import { OrderDetails, LocationData, Area, CartItem, Language, ServiceType, PromoCode, SiteConfig } from '../types';
 import { getStoredConfig } from '../data/menuData';
@@ -260,7 +259,33 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const currentFee = details.serviceType === 'delivery' ? (selectedArea?.fee || 0) : 0;
-  const discountAmount = appliedPromo ? (appliedPromo.discountType === 'percentage' ? (subtotal * appliedPromo.discountValue / 100) : appliedPromo.discountValue) : 0;
+  
+  const discountAmount = useMemo(() => {
+    if (!appliedPromo) return 0;
+    
+    // If no specific categories are restricted, apply to the whole subtotal
+    if (!appliedPromo.applicableCategories || appliedPromo.applicableCategories.length === 0) {
+      return appliedPromo.discountType === 'percentage' 
+        ? (subtotal * appliedPromo.discountValue / 100) 
+        : appliedPromo.discountValue;
+    }
+
+    // Calculate subtotal for eligible items only
+    const eligibleSubtotal = cartItems.reduce((acc, item) => {
+      const isCategoryEligible = appliedPromo.applicableCategories?.includes(item.category);
+      const isProductEligible = appliedPromo.applicableProducts?.includes(item.id);
+      
+      if (isCategoryEligible || isProductEligible) {
+        return acc + (item.price * item.quantity);
+      }
+      return acc;
+    }, 0);
+
+    return appliedPromo.discountType === 'percentage'
+      ? (eligibleSubtotal * appliedPromo.discountValue / 100)
+      : Math.min(appliedPromo.discountValue, eligibleSubtotal); // Don't discount more than the eligible total
+  }, [appliedPromo, subtotal, cartItems]);
+
   const finalTotal = subtotal + currentFee - discountAmount;
 
   const handleApplyPromo = async () => {
@@ -288,7 +313,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
        setAppliedPromo({ 
          code: data.code, 
          discountType: data.discount_type as any, 
-         discountValue: data.discount_value 
+         discountValue: data.discount_value,
+         applicableCategories: data.applicable_categories || [],
+         applicableProducts: data.applicable_products || []
        });
        setPromoInput('');
      } catch (err) {

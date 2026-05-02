@@ -34,7 +34,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const [builderSubTab, setBuilderSubTab] = useState<'branding' | 'hero' | 'categories' | 'tags' | 'social'>('branding');
   const [orders, setOrders] = useState<StoredOrder[]>([]);
   const [promoCodes, setPromoCodes] = useState<any[]>([]);
-  const [newPromo, setNewPromo] = useState<any>({ code: '', discount_type: 'percentage', discount_value: 0, min_order_value: 0 });
+  const [newPromo, setNewPromo] = useState<any>({ code: '', discount_type: 'percentage', discount_value: 0, min_order_value: 0, applicable_categories: [], applicable_products: [] });
   const [filterType, setFilterType] = useState<'day' | 'month' | 'year'>('month');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -445,6 +445,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const cardStyle = "bg-white p-10 rounded-[3.5rem] border-2 border-slate-50 shadow-sm space-y-10";
 
   return (
+    <>
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 md:p-6 dashboard-main-container">
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm no-print" onClick={onClose} />
       <div className="relative bg-slate-50 w-full h-full md:h-[95vh] md:rounded-[4rem] shadow-2xl flex flex-col overflow-hidden border-[12px] border-white no-print">
@@ -787,33 +788,94 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
             )}
 
             {activeTab === 'marketing' && (
-              <div className="space-y-12 animate-reveal">
-                <div className="flex justify-between items-center bg-white p-10 rounded-[3rem] shadow-xl">
-                  <div>
-                    <h3 className="text-4xl font-black brand-font text-slate-900 uppercase">Promo Codes</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">{promoCodes.length} ACTIVE CAMPAIGNS</p>
+              <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm space-y-10">
+                <div className="flex flex-col md:flex-row items-end gap-6">
+                  <div className="flex-1 space-y-4">
+                    <label className={labelStyle}>Campaign Details</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <input className={inputStyle} placeholder="CODE10" value={newPromo.code} onChange={e => setNewPromo({...newPromo, code: e.target.value.toUpperCase()})} />
+                      <select className={inputStyle} value={newPromo.discount_type} onChange={e => setNewPromo({...newPromo, discount_type: e.target.value})}>
+                        <option value="percentage">PERCENTAGE %</option>
+                        <option value="fixed">FIXED VALUE</option>
+                      </select>
+                      <input type="number" className={inputStyle} placeholder="Value" value={newPromo.discount_value} onChange={e => setNewPromo({...newPromo, discount_value: Number(e.target.value)})} />
+                    </div>
                   </div>
-                  <div className="flex gap-4">
-                    <input className={inputStyle + " w-40"} placeholder="CODE10" value={newPromo.code} onChange={e => setNewPromo({...newPromo, code: e.target.value.toUpperCase()})} />
-                    <select className={inputStyle + " w-40"} value={newPromo.discount_type} onChange={e => setNewPromo({...newPromo, discount_type: e.target.value})}>
-                      <option value="percentage">% PERCENTAGE</option>
-                      <option value="fixed">FIXED VALUE</option>
-                    </select>
-                    <input type="number" className={inputStyle + " w-24"} placeholder="Value" value={newPromo.discount_value} onChange={e => setNewPromo({...newPromo, discount_value: Number(e.target.value)})} />
-                    <button 
-                      onClick={async () => {
-                        if (!newPromo.code) return;
-                        await supabase.from('promo_codes').upsert(newPromo);
-                        setNewPromo({ code: '', discount_type: 'percentage', discount_value: 0, min_order_value: 0 });
-                      }}
-                      className="bg-slate-950 text-white px-8 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-600 transition-all"
-                    >
-                      Deploy Code
-                    </button>
+                  <div className="w-full md:w-48 space-y-4">
+                     <label className={labelStyle}>Min Order (LE)</label>
+                     <input type="number" className={inputStyle} value={newPromo.min_order_value} onChange={e => setNewPromo({...newPromo, min_order_value: Number(e.target.value)})} />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 border-t pt-10">
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-1">1. Restrict to Categories</h4>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Optional - Select sections to apply discount</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {config.layout.map(cat => {
+                        const isSelected = newPromo.applicable_categories?.includes(cat.id);
+                        return (
+                          <button
+                            key={cat.id}
+                            onClick={() => {
+                              const next = isSelected 
+                                ? newPromo.applicable_categories.filter((id: string) => id !== cat.id)
+                                : [...(newPromo.applicable_categories || []), cat.id];
+                              setNewPromo({ ...newPromo, applicable_categories: next });
+                            }}
+                            className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border-2 ${isSelected ? 'bg-red-600 border-red-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-red-100'}`}
+                          >
+                            {cat.nameEn}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-1">2. Restrict to Specific Items</h4>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Optional - Select individual products</p>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto no-scrollbar grid grid-cols-1 gap-2 p-4 bg-slate-50 rounded-3xl border border-slate-100">
+                      {menu.map(p => {
+                        const isSelected = newPromo.applicable_products?.includes(p.id);
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              const next = isSelected 
+                                ? newPromo.applicable_products.filter((id: string) => id !== p.id)
+                                : [...(newPromo.applicable_products || []), p.id];
+                              setNewPromo({ ...newPromo, applicable_products: next });
+                            }}
+                            className={`flex items-center gap-3 p-3 rounded-2xl transition-all border-2 ${isSelected ? 'bg-white border-red-600 shadow-sm' : 'bg-transparent border-transparent opacity-60 hover:opacity-100'}`}
+                          >
+                            <img src={p.image} className="w-8 h-8 rounded-lg object-contain" />
+                            <span className="text-[10px] font-black uppercase text-slate-900 truncate">{p.name}</span>
+                            {isSelected && <CheckCircle2 size={14} className="text-red-600 ml-auto" />}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <button 
+                  onClick={async () => {
+                    if (!newPromo.code) return;
+                    await supabase.from('promo_codes').upsert(newPromo);
+                    setNewPromo({ code: '', discount_type: 'percentage', discount_value: 0, min_order_value: 0, applicable_categories: [], applicable_products: [] });
+                  }}
+                  className="w-full bg-slate-950 text-white py-6 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-red-600 transition-all shadow-xl shadow-slate-200"
+                >
+                  Deploy New Campaign
+                </button>
+
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-10">
                   {promoCodes.map(pc => (
                     <div key={pc.code} className="bg-white p-10 rounded-[3.5rem] shadow-xl border border-slate-100 flex flex-col justify-between">
                       <div className="flex justify-between items-start mb-10">
@@ -837,6 +899,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                              </span>
                            )}
                         </div>
+                        {pc.applicable_categories && pc.applicable_categories.length > 0 && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                             {pc.applicable_categories.map((catId: string) => (
+                               <span key={catId} className="bg-red-50 text-red-600 text-[8px] font-black px-3 py-1 rounded-lg border border-red-100">
+                                 {config.layout.find(c => c.id === catId)?.nameEn || catId}
+                               </span>
+                             ))}
+                          </div>
+                        )}
+                        {pc.applicable_products && pc.applicable_products.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                             {pc.applicable_products.map((prodId: string) => (
+                               <span key={prodId} className="bg-slate-950 text-white text-[8px] font-black px-3 py-1 rounded-lg">
+                                 {menu.find(p => p.id === prodId)?.name || prodId}
+                               </span>
+                             ))}
+                          </div>
+                        )}
                       </div>
                       <div className="mt-10 pt-10 border-t-2 border-slate-50 flex items-center justify-between">
                          <div className="flex items-center gap-4">
@@ -1538,6 +1618,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
         </div>
       </div>
     </div>
+    </>
   );
 };
 

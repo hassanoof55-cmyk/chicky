@@ -104,6 +104,8 @@ export interface PromoCode {
   discountType: 'percentage' | 'fixed';
   discountValue: number;
   minOrderValue?: number;
+  applicableCategories?: string[]; // IDs of categories this code applies to
+  applicableProducts?: string[];   // IDs of specific products this code applies to
 }
 
 export interface UserProfile {
