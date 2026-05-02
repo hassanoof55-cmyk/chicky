@@ -529,34 +529,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                         }).filter(o => o.status !== 'cancelled');
 
                         const headers = ["Order ID", "Date", "Customer", "Phone", "Area", "Total Price", "Status", "Items"];
-                        const rows = filtered.map(o => [
-                          o.id.slice(-6),
-                          new Date(o.createdAt).toLocaleString('ar-EG'),
-                          o.customerName,
-                          o.phone,
-                          o.area || 'N/A',
-                          o.totalPrice,
-                          o.status === 'pending' ? 'قيد التنفيذ' : o.status === 'completed' ? 'تم التوصيل' : 'ملغي',
-                          o.items.map((i, idx) => `${idx + 1}. ${i.name} (x${i.quantity})`).join('&#10;')
-                        ]);
+                        
+                        // Create CSV content with UTF-8 BOM for Arabic support
+                        const csvRows = [
+                          headers.join(','),
+                          ...filtered.map(o => {
+                            const statusLabel = o.status === 'pending' ? 'قيد التنفيذ' : o.status === 'completed' ? 'تم التوصيل' : 'ملغي';
+                            const itemsList = o.items.map(i => `${i.name} (x${i.quantity})`).join(' | ');
+                            
+                            // Escape commas and quotes for CSV
+                            return [
+                              `"${o.id.slice(-6)}"`,
+                              `"${new Date(o.createdAt).toLocaleString('ar-EG')}"`,
+                              `"${o.customerName.replace(/"/g, '""')}"`,
+                              `"${o.phone}"`,
+                              `"${(o.area || 'N/A').replace(/"/g, '""')}"`,
+                              o.totalPrice,
+                              `"${statusLabel}"`,
+                              `"${itemsList.replace(/"/g, '""')}"`
+                            ].join(',');
+                          })
+                        ];
 
-                        // Generate XML Spreadsheet format (works as .xls)
-                        const template = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-<Styles>
-  <Style ss:ID="sWrap">
-    <Alignment ss:Vertical="Top" ss:WrapText="1"/>
-  </Style>
-  <Style ss:ID="sHeader">
-    <Font ss:Bold="1"/>
-    <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
-  </Style>
-</Styles>
-<Worksheet ss:Name="Chicky Report">
-<Table>
-<Row>${headers.map(h => `<Cell ss:StyleID="sHeader"><Data ss:Type="String">${h}</Data></Cell>`).join('')}</Row>
-${rows.map(row => `<Row ss:AutoFitHeight="1">${row.map((cell, i) => `<Cell ss:StyleID="${i === headers.length - 1 ? 'sWrap' : ''}"><Data ss:Type="${typeof cell === 'number' ? 'Number' : 'String'}">${cell}</Data></Cell>`).join('')}</Row>`).join('')}
-</Table></Worksheet></Workbook>`;
+                        const csvString = '\uFEFF' + csvRows.join('\n'); // Add BOM for Excel UTF-8 support
 
                         const getDayName = (dateStr: string) => {
                           return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date(dateStr));
@@ -568,10 +563,10 @@ ${rows.map(row => `<Row ss:AutoFitHeight="1">${row.map((cell, i) => `<Cell ss:St
                           ? `Chicky_Report_${selectedMonth}` 
                           : `Chicky_Report_${selectedYear}`;
 
-                        const blob = new Blob([template], { type: 'application/vnd.ms-excel' });
+                        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
                         const link = document.createElement("a");
                         link.href = URL.createObjectURL(blob);
-                        link.download = `${fileName}.xls`;
+                        link.download = `${fileName}.csv`;
                         link.click();
                       }}
                       className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-200 hover:scale-105 transition-all flex items-center gap-3"

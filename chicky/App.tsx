@@ -364,6 +364,8 @@ const App: React.FC = () => {
         onHomeClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
         onSearchClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
         onMenuClick={() => scrollToCategory(config.layout[0]?.id)}
+        categories={config.layout}
+        onCategoryClick={scrollToCategory}
       />
 
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} items={cart} onUpdateQuantity={updateQuantity} onRemove={removeFromCart} onCheckout={() => { setIsCartOpen(false); setIsCheckoutOpen(true); }} lang={lang} />
