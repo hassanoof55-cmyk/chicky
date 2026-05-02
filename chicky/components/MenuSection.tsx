@@ -179,18 +179,20 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
                   })}
                 </div>
                 
-                {/* Price Tag */}
-                <div className="absolute bottom-3 md:bottom-6 right-3 md:right-6 bg-slate-900/95 backdrop-blur-xl text-white px-3 md:px-5 py-1.5 md:py-2.5 rounded-xl md:rounded-2xl shadow-red border border-white/10 flex flex-col items-end">
-                  {item.originalPrice !== undefined && item.originalPrice > item.price && item.originalPrice > 0 ? (
-                    <span className="text-[8px] md:text-[10px] text-red-400 leading-none mb-0.5 md:mb-1 font-black line-through opacity-80 uppercase">
-                       {item.originalPrice}
-                    </span>
-                  ) : null}
-                  <div className="flex items-baseline justify-end gap-1 md:gap-1.5">
+                {/* Price Tag - Classic Comparison Style */}
+                <div className="absolute bottom-3 right-3 bg-slate-900/95 backdrop-blur-xl text-white px-3 py-2 rounded-2xl shadow-2xl border border-white/5 flex items-center gap-3 z-10">
+                  {item.originalPrice !== undefined && item.originalPrice > item.price && item.originalPrice > 0 && (
+                    <div className="flex items-center border-r border-white/10 pr-3">
+                       <span className="text-red-500 font-black text-xs md:text-sm line-through decoration-white/40 decoration-[1.5px]">
+                          {item.originalPrice}
+                       </span>
+                    </div>
+                  )}
+                  <div className="flex items-baseline gap-1">
                     <span className="text-lg md:text-2xl font-black leading-none text-white tracking-tighter">
                       {item.price}
                     </span>
-                    <span className="text-[8px] md:text-[10px] font-black text-white/40 uppercase tracking-widest">{lang === 'en' ? 'LE' : 'ج.م'}</span>
+                    <span className="text-[7px] md:text-[9px] font-black text-white/40 uppercase">{isAr ? 'ج.م' : 'LE'}</span>
                   </div>
                 </div>
               </div>

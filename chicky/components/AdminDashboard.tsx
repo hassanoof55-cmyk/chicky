@@ -4,10 +4,10 @@ import {
   X, Plus, Edit2, Trash2, Search, Layout, Database,
   Settings2, Truck, Map as MapIcon, AppWindow,
   Sparkles, Star, Flame, Image as ImageIcon, Save,
-  ChevronRight, Phone, Globe, Facebook, Instagram, Upload, FileImage,
+  ChevronRight, ChevronUp, ChevronDown, Phone, Globe, Facebook, Instagram, Upload, FileImage,
   RotateCcw, Layers, Hash, Check, Trash, Info, Key, MapPin,
   Palette, Share2, BarChart3, ListOrdered, AlignLeft, Eye, Tag as TagIcon,
-  ArrowRight, MousePointer2, Navigation, CheckCircle2, Bell, Loader2
+  ArrowRight, MousePointer2, Navigation, CheckCircle2, Bell, Loader2, Download, FileSpreadsheet
 } from 'lucide-react';
 import { Product, SiteConfig, Area, HeroBanner, TagConfig, CategoryConfig, OrderDetails, StoredOrder, ProductSize } from '../types';
 import { supabase } from '../lib/supabase';
@@ -35,6 +35,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const [orders, setOrders] = useState<StoredOrder[]>([]);
   const [promoCodes, setPromoCodes] = useState<any[]>([]);
   const [newPromo, setNewPromo] = useState<any>({ code: '', discount_type: 'percentage', discount_value: 0, min_order_value: 0 });
+  const [filterType, setFilterType] = useState<'day' | 'month' | 'year'>('month');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
 
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -56,6 +60,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const [currentPolygonPoints, setCurrentPolygonPoints] = useState<[number, number][]>([]);
   const [newArea, setNewArea] = useState<Partial<Area>>({ nameEn: '', nameAr: '', fee: 0 });
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
+
 
   const [localFilterLabelEn, setLocalFilterLabelEn] = useState(config.filterLabelEn || '');
   const [localFilterLabelAr, setLocalFilterLabelAr] = useState(config.filterLabelAr || '');
@@ -124,6 +129,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
 
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  const stats = React.useMemo(() => {
+    const filteredOrders = orders.filter(o => {
+      if (!o.createdAt) return false;
+      const matchesDate = filterType === 'day' ? o.createdAt.startsWith(selectedDate) : 
+                         filterType === 'month' ? o.createdAt.startsWith(selectedMonth) :
+                         o.createdAt.startsWith(selectedYear);
+      const isNotCancelled = o.status !== 'cancelled';
+      return matchesDate && isNotCancelled;
+    });
+    
+    const totalOrders = filteredOrders.length;
+    const totalRevenue = filteredOrders.reduce((acc, o) => acc + o.totalPrice, 0);
+    
+    const areaStats: Record<string, { count: number; revenue: number }> = {};
+    const itemStats: Record<string, number> = {};
+
+    filteredOrders.forEach(order => {
+      // Area Stats
+      const area = order.area || 'Unknown';
+      if (!areaStats[area]) areaStats[area] = { count: 0, revenue: 0 };
+      areaStats[area].count += 1;
+      areaStats[area].revenue += order.totalPrice;
+
+      // Item Stats
+      order.items.forEach(item => {
+        itemStats[item.name] = (itemStats[item.name] || 0) + item.quantity;
+      });
+    });
+
+    const topArea = Object.entries(areaStats).sort((a, b) => b[1].count - a[1].count)[0];
+    const topItem = Object.entries(itemStats).sort((a, b) => b[1] - a[1])[0];
+
+    return { totalOrders, totalRevenue, areaStats, topArea, topItem };
+  }, [orders, selectedMonth, selectedDate, selectedYear, filterType]);
 
 
   const adminMapRef = useRef<any>(null);
@@ -364,6 +404,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
     setNewTag({ en: '', ar: '' });
   };
 
+  const moveCategory = (index: number, direction: 'up' | 'down') => {
+    const newLayout = [...config.layout];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newLayout.length) return;
+    
+    [newLayout[index], newLayout[targetIndex]] = [newLayout[targetIndex], newLayout[index]];
+    syncConfig({ ...config, layout: newLayout });
+  };
+
   const toggleProductTag = (tagName: string) => {
     if (!editingProduct) return;
     const currentTags = editingProduct.tags || [];
@@ -396,9 +445,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const cardStyle = "bg-white p-10 rounded-[3.5rem] border-2 border-slate-50 shadow-sm space-y-10";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/98 backdrop-blur-2xl" onClick={onClose} />
-      <div className="relative bg-white w-full max-w-7xl h-[94vh] rounded-[4rem] shadow-2xl overflow-hidden flex flex-col border-[8px] border-white animate-scale-up">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 md:p-6 dashboard-main-container">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm no-print" onClick={onClose} />
+      <div className="relative bg-slate-50 w-full h-full md:h-[95vh] md:rounded-[4rem] shadow-2xl flex flex-col overflow-hidden border-[12px] border-white no-print">
 
         <div className="w-full bg-slate-50 border-b-2 border-slate-100 flex items-center justify-between px-10 py-6 shrink-0">
           <div className="flex items-center gap-6">
@@ -435,8 +484,151 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
             {activeTab === 'orders' && (
               <div className="space-y-10 animate-reveal pb-20">
                 <div className="flex items-center justify-between bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm">
-                  <h3 className="text-3xl font-black brand-font uppercase text-slate-900">Customer Orders</h3>
-                  <button onClick={() => { if (confirm('Clear all orders?')) { localStorage.removeItem('chicky_orders'); setOrders([]); } }} className="text-[10px] font-black uppercase text-red-600 tracking-widest hover:underline">Clear History</button>
+                  <div>
+                    <h3 className="text-3xl font-black brand-font uppercase text-slate-900">Order Analytics</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Viewing {filterType === 'day' ? 'Daily' : 'Monthly'} statistics</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex bg-slate-100 p-1.5 rounded-xl">
+                      <button onClick={() => setFilterType('day')} className={`px-4 py-2 rounded-lg text-[10px] font-black transition-all ${filterType === 'day' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400'}`}>DAILY</button>
+                      <button onClick={() => setFilterType('month')} className={`px-4 py-2 rounded-lg text-[10px] font-black transition-all ${filterType === 'month' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400'}`}>MONTHLY</button>
+                      <button onClick={() => setFilterType('year')} className={`px-4 py-2 rounded-lg text-[10px] font-black transition-all ${filterType === 'year' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400'}`}>YEARLY</button>
+                    </div>
+                    {filterType === 'month' ? (
+                      <input 
+                        type="month" 
+                        value={selectedMonth} 
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        className="bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2 font-black text-xs text-slate-900 focus:border-red-600 outline-none transition-all"
+                      />
+                    ) : filterType === 'day' ? (
+                      <input 
+                        type="date" 
+                        value={selectedDate} 
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2 font-black text-xs text-slate-900 focus:border-red-600 outline-none transition-all"
+                      />
+                    ) : (
+                      <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(e.target.value)}
+                        className="bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2 font-black text-xs text-slate-900 focus:border-red-600 outline-none transition-all"
+                      >
+                        {Array.from({ length: new Date().getFullYear() - 2024 + 1 }, (_, i) => 2024 + i).map(y => (
+                          <option key={y} value={y.toString()}>{y}</option>
+                        ))}
+                      </select>
+                    )}
+                    <button 
+                      onClick={() => {
+                        const filtered = orders.filter(o => {
+                          if (!o.createdAt) return false;
+                          if (filterType === 'day') return o.createdAt.startsWith(selectedDate);
+                          if (filterType === 'month') return o.createdAt.startsWith(selectedMonth);
+                          return o.createdAt.startsWith(selectedYear);
+                        }).filter(o => o.status !== 'cancelled');
+
+                        const headers = ["Order ID", "Date", "Customer", "Phone", "Area", "Total Price", "Status", "Items"];
+                        const rows = filtered.map(o => [
+                          o.id.slice(-6),
+                          new Date(o.createdAt).toLocaleString('ar-EG'),
+                          o.customerName,
+                          o.phone,
+                          o.area || 'N/A',
+                          o.totalPrice,
+                          o.status === 'pending' ? 'قيد التنفيذ' : o.status === 'completed' ? 'تم التوصيل' : 'ملغي',
+                          o.items.map((i, idx) => `${idx + 1}. ${i.name} (x${i.quantity})`).join('&#10;')
+                        ]);
+
+                        // Generate XML Spreadsheet format (works as .xls)
+                        const template = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>
+  <Style ss:ID="sWrap">
+    <Alignment ss:Vertical="Top" ss:WrapText="1"/>
+  </Style>
+  <Style ss:ID="sHeader">
+    <Font ss:Bold="1"/>
+    <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
+  </Style>
+</Styles>
+<Worksheet ss:Name="Chicky Report">
+<Table>
+<Row>${headers.map(h => `<Cell ss:StyleID="sHeader"><Data ss:Type="String">${h}</Data></Cell>`).join('')}</Row>
+${rows.map(row => `<Row ss:AutoFitHeight="1">${row.map((cell, i) => `<Cell ss:StyleID="${i === headers.length - 1 ? 'sWrap' : ''}"><Data ss:Type="${typeof cell === 'number' ? 'Number' : 'String'}">${cell}</Data></Cell>`).join('')}</Row>`).join('')}
+</Table></Worksheet></Workbook>`;
+
+                        const getDayName = (dateStr: string) => {
+                          return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date(dateStr));
+                        };
+
+                        const fileName = filterType === 'day' 
+                          ? `Chicky_Report_${selectedDate}_${getDayName(selectedDate)}` 
+                          : filterType === 'month' 
+                          ? `Chicky_Report_${selectedMonth}` 
+                          : `Chicky_Report_${selectedYear}`;
+
+                        const blob = new Blob([template], { type: 'application/vnd.ms-excel' });
+                        const link = document.createElement("a");
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `${fileName}.xls`;
+                        link.click();
+                      }}
+                      className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-200 hover:scale-105 transition-all flex items-center gap-3"
+                    >
+                      <FileSpreadsheet size={16} /> Export Report
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                   <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Total Revenue</span>
+                      <h4 className="text-3xl font-black text-slate-900 leading-none">{stats.totalRevenue} <span className="text-sm">LE</span></h4>
+                   </div>
+                   <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Total Orders</span>
+                      <h4 className="text-3xl font-black text-slate-900 leading-none">{stats.totalOrders}</h4>
+                   </div>
+                   <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Top Area</span>
+                      <h4 className="text-xl font-black text-red-600 leading-tight truncate">{stats.topArea ? stats.topArea[0] : 'N/A'}</h4>
+                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">{stats.topArea ? stats.topArea[1].count : 0} Orders</p>
+                   </div>
+                   <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Best Seller</span>
+                      <h4 className="text-xl font-black text-slate-900 leading-tight truncate">{stats.topItem ? stats.topItem[0] : 'N/A'}</h4>
+                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">{stats.topItem ? stats.topItem[1] : 0} Sold</p>
+                   </div>
+                </div>
+
+                {/* Area Breakdown Table */}
+                <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm">
+                   <h4 className="text-xl font-black brand-font uppercase text-slate-900 mb-8 flex items-center gap-4">
+                     <MapIcon size={20} className="text-red-600" /> Orders per Area Breakdown
+                   </h4>
+                   <div className="space-y-4">
+                      {Object.entries(stats.areaStats).map(([area, data]) => (
+                        <div key={area} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all">
+                           <span className="font-black text-slate-900 text-sm uppercase">{area}</span>
+                           <div className="flex items-center gap-8">
+                              <div className="text-right">
+                                 <span className="text-[9px] font-black text-slate-400 uppercase block leading-none">Count</span>
+                                 <span className="text-sm font-black text-slate-900">{data.count}</span>
+                              </div>
+                              <div className="text-right min-w-[80px]">
+                                 <span className="text-[9px] font-black text-slate-400 uppercase block leading-none">Revenue</span>
+                                 <span className="text-sm font-black text-red-600">{data.revenue} LE</span>
+                              </div>
+                           </div>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+
+                <div className="pt-10 border-t border-slate-100">
+                   <h3 className="text-2xl font-black brand-font uppercase text-slate-900 mb-8">Recent Orders History</h3>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
@@ -489,14 +681,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                                 <div className="flex items-start gap-4 text-slate-500 font-medium text-sm leading-relaxed">
                                   <MapPin size={16} className="text-slate-300 mt-1 shrink-0" /> {order.address} ({order.area})
                                 </div>
-                                <a
-                                  href={`https://www.google.com/maps?q=${order.location.lat},${order.location.lng}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="flex items-center gap-3 text-[10px] font-black text-red-600 uppercase tracking-widest hover:underline pt-2"
-                                >
-                                  <Navigation size={14} fill="currentColor" /> View Exact Pin on Maps
-                                </a>
+                                {order.location && typeof order.location === 'object' && 'lat' in order.location && (
+                                  <a
+                                    href={`https://www.google.com/maps?q=${order.location.lat},${order.location.lng}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center gap-3 text-[10px] font-black text-red-600 uppercase tracking-widest hover:underline pt-2"
+                                  >
+                                    <Navigation size={14} fill="currentColor" /> View Exact Pin on Maps
+                                  </a>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -749,7 +943,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                                 <span className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center font-black text-xs text-red-600 border-2 border-slate-100 shadow-sm">{idx + 1}</span>
                                 <div><h5 className="font-black text-slate-900 uppercase text-lg leading-none mb-1">{cat.nameEn}</h5><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{cat.nameAr}</p></div>
                               </div>
-                              <button onClick={() => { if (confirm('Delete?')) { syncConfig({ ...config, layout: config.layout.filter(l => l.id !== cat.id) }); } }} className="p-4 text-slate-300 hover:text-slate-900 transition-all"><Trash2 size={20} /></button>
+                              <div className="flex items-center gap-2">
+                                <div className="flex flex-col gap-1 mr-2">
+                                  <button 
+                                    disabled={idx === 0}
+                                    onClick={() => moveCategory(idx, 'up')}
+                                    className={`p-1.5 rounded-lg transition-all ${idx === 0 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
+                                  >
+                                    <ChevronUp size={18} />
+                                  </button>
+                                  <button 
+                                    disabled={idx === config.layout.length - 1}
+                                    onClick={() => moveCategory(idx, 'down')}
+                                    className={`p-1.5 rounded-lg transition-all ${idx === config.layout.length - 1 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
+                                  >
+                                    <ChevronDown size={18} />
+                                  </button>
+                                </div>
+                                <button onClick={() => { if (confirm('Delete?')) { syncConfig({ ...config, layout: config.layout.filter(l => l.id !== cat.id) }); } }} className="p-4 text-slate-300 hover:text-slate-900 transition-all"><Trash2 size={20} /></button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1203,6 +1415,132 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
           </div>
         )}
 
+        {/* Professional Print Report (Hidden in UI, visible in Print) */}
+        <div id="print-report-root" className="hidden print:block bg-white p-10 font-sans text-slate-900">
+          {/* Smart Print Styles */}
+          <style dangerouslySetInnerHTML={{ __html: `
+            @media print {
+              /* Hide all browser UI elements like headers/footers if possible */
+              @page { size: A4; margin: 10mm; }
+              
+              /* Hide everything by default */
+              body * { visibility: hidden; }
+              
+              /* Show ONLY the report and its contents */
+              #print-report-root, #print-report-root * { 
+                visibility: visible !important; 
+              }
+              
+              /* Position the report at the very top of the printed page */
+              #print-report-root {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                display: block !important;
+                background: white !important;
+              }
+
+              /* Hide the main dashboard UI specifically */
+              .no-print { display: none !important; }
+            }
+          `}} />
+
+          {/* Report Header */}
+          <div className="flex justify-between items-center border-b-4 border-slate-900 pb-6 mb-8">
+            <div className="flex items-center gap-4">
+               <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black">CH</div>
+               <div>
+                  <h1 className="text-3xl font-black tracking-tighter uppercase leading-none mb-1">CHICKY Analytics</h1>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Official Restaurant Performance Report</p>
+               </div>
+            </div>
+            <div className="text-right">
+               <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Report Generated</p>
+               <p className="text-sm font-bold">{new Date().toLocaleString('ar-EG')}</p>
+            </div>
+          </div>
+
+          <div className="mb-8">
+             <div className="bg-slate-50 p-6 rounded-2xl border-l-8 border-red-600 mb-8">
+                <h2 className="text-2xl font-black uppercase mb-1">
+                  {filterType === 'day' ? `Daily Summary: ${selectedDate}` : `Monthly Analysis: ${selectedMonth}`}
+                </h2>
+                <p className="text-xs text-slate-500 font-medium italic">This report provides a detailed breakdown of sales and customer activity.</p>
+             </div>
+
+             {/* Key Metrics Grid */}
+             <div className="grid grid-cols-4 gap-4 mb-8">
+                <div className="border border-slate-200 p-4 rounded-xl bg-white">
+                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Revenue</span>
+                   <span className="text-2xl font-black text-slate-900">{stats.totalRevenue} <small className="text-[10px]">LE</small></span>
+                </div>
+                <div className="border border-slate-200 p-4 rounded-xl bg-white">
+                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Orders</span>
+                   <span className="text-2xl font-black text-slate-900">{stats.totalOrders}</span>
+                </div>
+                <div className="border border-slate-200 p-4 rounded-xl bg-white">
+                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Top Area</span>
+                   <span className="text-lg font-black text-red-600 truncate block">{stats.topArea ? stats.topArea[0] : 'N/A'}</span>
+                </div>
+                <div className="border border-slate-200 p-4 rounded-xl bg-white">
+                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Best Seller</span>
+                   <span className="text-lg font-black text-slate-900 truncate block">{stats.topItem ? stats.topItem[0] : 'N/A'}</span>
+                </div>
+             </div>
+
+             {/* Detailed Analytics */}
+             <div className="space-y-8">
+                <section>
+                   <h3 className="text-sm font-black uppercase bg-slate-900 text-white px-4 py-2 rounded-lg mb-4">Area Revenue Distribution</h3>
+                   <table className="w-full text-left border-collapse">
+                      <thead>
+                         <tr className="border-b-2 border-slate-200">
+                            <th className="py-2 text-[10px] font-black uppercase">Area</th>
+                            <th className="py-2 text-[10px] font-black uppercase text-center">Orders</th>
+                            <th className="py-2 text-[10px] font-black uppercase text-right">Revenue</th>
+                         </tr>
+                      </thead>
+                      <tbody>
+                         {Object.entries(stats.areaStats).map(([area, data]) => (
+                            <tr key={area} className="border-b border-slate-100">
+                               <td className="py-3 text-xs font-bold uppercase">{area}</td>
+                               <td className="py-3 text-xs font-medium text-center">{data.count}</td>
+                               <td className="py-3 text-xs font-black text-right">{data.revenue} LE</td>
+                            </tr>
+                         ))}
+                      </tbody>
+                   </table>
+                </section>
+
+                <section>
+                   <h3 className="text-sm font-black uppercase bg-slate-100 text-slate-900 px-4 py-2 rounded-lg mb-4">Top Performing Products</h3>
+                   <table className="w-full text-left border-collapse">
+                      <thead>
+                         <tr className="border-b-2 border-slate-200">
+                            <th className="py-2 text-[10px] font-black uppercase">Product Name</th>
+                            <th className="py-2 text-[10px] font-black uppercase text-right">Items Sold</th>
+                         </tr>
+                      </thead>
+                      <tbody>
+                         {Object.entries(stats.topItem ? { [stats.topItem[0]]: stats.topItem[1] } : {}).map(([name, qty]) => (
+                            <tr key={name} className="border-b border-slate-50">
+                               <td className="py-3 text-xs font-bold uppercase">{name}</td>
+                               <td className="py-3 text-xs font-black text-right">{qty} Units</td>
+                            </tr>
+                         ))}
+                      </tbody>
+                   </table>
+                </section>
+             </div>
+          </div>
+
+          {/* Footer Signature */}
+          <div className="mt-12 pt-6 border-t border-slate-100 flex justify-between items-center italic">
+             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Chicky Restaurant Management System • Confidential Report</p>
+             <p className="text-[9px] font-bold text-slate-400">Page 1 of 1</p>
+          </div>
+        </div>
       </div>
     </div>
   );

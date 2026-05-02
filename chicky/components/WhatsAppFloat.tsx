@@ -20,7 +20,15 @@ const WhatsAppFloat: React.FC<WhatsAppFloatProps> = ({ phone, lang }) => {
     ? encodeURIComponent('مرحباً شيكي! 🍗 أريد طلب وجبة شهية الآن.') 
     : encodeURIComponent('Hello Chicky! 🍗 I want to order a delicious meal now.');
 
-  const whatsappUrl = `https://wa.me/20${phone}?text=${message}`;
+  const formatWhatsAppNumber = (num: string) => {
+    let cleaned = num.replace(/\D/g, '');
+    if (cleaned.startsWith('00')) cleaned = cleaned.substring(2);
+    if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
+    if (!cleaned.startsWith('20')) cleaned = '20' + cleaned;
+    return cleaned;
+  };
+
+  const whatsappUrl = `https://wa.me/${formatWhatsAppNumber(phone)}?text=${message}`;
 
   return (
     <div className={`fixed bottom-28 md:bottom-8 ${isAr ? 'left-8' : 'right-8'} z-[100] group`}>

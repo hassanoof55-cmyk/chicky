@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Navbar from './components/Navbar';
 import MenuSection from './components/MenuSection';
 import RecommendedSection from './components/RecommendedSection';
@@ -107,6 +107,8 @@ const App: React.FC = () => {
     document.title = isAr ? 'تشيكي فرايد تشيكن | أقوى فرايد تشيكن' : 'Chicky Fried Chicken | Egypt\'s #1';
   }, [config.theme.primaryColor, isAr, config.header.logoRed]);
 
+
+
   const updateMenu = (newMenu: Product[]) => {
     setMenu(newMenu);
     saveMenuToStorage(newMenu);
@@ -138,18 +140,29 @@ const App: React.FC = () => {
   }, [searchQuery, menu, activeTag]);
 
   const recommendations = useMemo(() => {
-    if (cart.length === 0) return menu.filter(p => p.category === 'cat_deals').slice(0, 4);
-    const cartCategories = new Set(cart.map(item => item.category));
-    const hasMainMeal = cartCategories.has('cat_sandwiches') || cartCategories.has('cat_family') || cartCategories.has('cat_deals');
-    if (hasMainMeal && !cartCategories.has('cat_sides')) {
-      return menu.filter(p => p.category === 'cat_sides').slice(0, 4);
+    // If cart is empty, show Best Sellers
+    if (cart.length === 0) {
+      const bestSellers = menu.filter(p => p.tags?.some(t => t.toLowerCase().includes('best') || t.toLowerCase().includes('seller')));
+      if (bestSellers.length > 0) return bestSellers.slice(0, 6);
+      return menu.filter(p => p.category === 'deals' || p.category === 'cat_deals').slice(0, 4);
     }
+    
+    // Cross-sell logic
+    const cartCategories = new Set(cart.map(item => item.category));
+    const hasMainMeal = cartCategories.has('sandwiches') || cartCategories.has('cat_sandwiches') || 
+                        cartCategories.has('family-meals') || cartCategories.has('cat_family') || 
+                        cartCategories.has('deals') || cartCategories.has('cat_deals');
+    
+    if (hasMainMeal && !cartCategories.has('sides') && !cartCategories.has('cat_sides')) {
+      return menu.filter(p => p.category === 'sides' || p.category === 'cat_sides').slice(0, 4);
+    }
+    
     return menu.filter(p => !cart.some(c => c.id === p.id)).slice(0, 4);
   }, [cart, menu]);
 
   const recommendationTitle = useMemo(() => {
-    if (cart.length === 0) return isAr ? 'الأكثر طلباً' : 'TRENDING NOW';
-    return isAr ? 'قد يعجبك أيضاً' : 'YOU MIGHT ALSO LIKE';
+    if (cart.length === 0) return isAr ? 'الأكثر طلباً' : 'MOST POPULAR';
+    return isAr ? 'نقترح لك أيضاً' : 'YOU MIGHT ALSO LIKE';
   }, [cart, isAr]);
 
   const addToCart = (product: Product, spiciness?: 'Normal' | 'Spicy', size?: any, modifiers?: any[]) => {

@@ -1,0 +1,7 @@
+<svg width="400" height="200" viewBox="0 0 400 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="200" fill="#4B0082"/>
+  <text x="40" y="120" font-family="Arial, sans-serif" font-weight="900" font-size="60" fill="white">INSTA</text>
+  <path d="M240 70L270 100L240 130H270L300 100L270 70H240Z" fill="#FF4500"/>
+  <path d="M280 70L310 100L280 130H310L340 100L310 70H280Z" fill="#FF8C00"/>
+  <text x="310" y="120" font-family="Arial, sans-serif" font-weight="900" font-size="60" fill="white">PAY</text>
+</svg>

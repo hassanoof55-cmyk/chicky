@@ -19,6 +19,24 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdat
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [lastActionId, setLastActionId] = useState<string | null>(null);
 
+  const isAr = lang === 'ar';
+
+  const t = {
+    title: isAr ? 'سلتي' : 'MY BASKET',
+    itemsSelected: isAr ? 'أصناف مختارة' : 'Items selected',
+    item: isAr ? 'صنف' : 'Item',
+    empty: isAr ? 'السلة فارغة' : 'Basket is empty',
+    emptySub: isAr ? 'ابدأ بإضافة بعض الوجبات الشهية!' : 'Start adding deliciousness!',
+    browseMenu: isAr ? 'تصفح القائمة' : 'BROWSE MENU',
+    subtotal: isAr ? 'إجمالي الأصناف' : 'Items Subtotal',
+    delivery: isAr ? 'التوصيل' : 'Delivery',
+    calcCheckout: isAr ? 'يتم حسابه عند الدفع' : 'Calculated at checkout',
+    totalEstimate: isAr ? 'الإجمالي المتوقع' : 'TOTAL ESTIMATE',
+    goCheckout: isAr ? 'الذهاب للدفع' : 'GO TO CHECKOUT',
+    spicy: isAr ? 'حار' : 'Spicy',
+    normal: isAr ? 'عادي' : 'Normal'
+  };
+
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   const getItemKey = (item: CartItem) => {
@@ -46,20 +64,20 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdat
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-hidden">
+    <div className="fixed inset-0 z-[60] overflow-hidden" dir={isAr ? 'rtl' : 'ltr'}>
       <div 
         className="absolute inset-0 bg-black/40 backdrop-blur-md transition-opacity duration-300" 
         onClick={onClose}
       />
-      <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl flex flex-col animate-slide-in">
+      <div className={`absolute ${isAr ? 'left-0' : 'right-0'} top-0 h-full w-full max-w-md bg-white shadow-2xl flex flex-col ${isAr ? 'animate-slide-in-left' : 'animate-slide-in'}`}>
         <div className="p-6 border-b flex items-center justify-between bg-gray-50">
           <div className="flex flex-col">
             <h2 className="text-2xl font-black brand-font text-red-600 flex items-center gap-3">
               <ShoppingBag className="shrink-0" />
-              MY BASKET
+              {t.title}
             </h2>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-9">
-              {items.length} {items.length === 1 ? 'Item' : 'Items'} selected
+            <p className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest ${isAr ? 'mr-9' : 'ml-9'}`}>
+              {items.length} {isAr ? t.itemsSelected : (items.length === 1 ? t.item : t.itemsSelected)}
             </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-xl transition-all active:scale-90">
@@ -74,14 +92,14 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdat
                 <ShoppingBag size={64} className="text-gray-300" />
               </div>
               <div className="text-center">
-                <p className="text-xl font-black text-gray-800 uppercase tracking-tighter brand-font">Basket is empty</p>
-                <p className="text-sm font-medium mt-1">Start adding deliciousness!</p>
+                <p className="text-xl font-black text-gray-800 uppercase tracking-tighter brand-font">{t.empty}</p>
+                <p className="text-sm font-medium mt-1">{t.emptySub}</p>
               </div>
               <button 
                 onClick={onClose}
                 className="bg-red-600 text-white font-black px-8 py-3 rounded-2xl shadow-xl shadow-red-100 hover:scale-105 active:scale-95 transition-all"
               >
-                BROWSE MENU
+                {t.browseMenu}
               </button>
             </div>
           ) : (
@@ -90,22 +108,22 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdat
               return (
                 <div 
                   key={itemKey} 
-                  className={`flex gap-4 p-4 bg-white border border-gray-100 rounded-3xl shadow-sm transition-all duration-300 ${removingKey === itemKey ? 'animate-exit-right opacity-0' : 'animate-scale-up'}`}
+                  className={`flex gap-4 p-4 bg-white border border-gray-100 rounded-3xl shadow-sm transition-all duration-300 ${removingKey === itemKey ? (isAr ? 'animate-exit-left' : 'animate-exit-right') + ' opacity-0' : 'animate-scale-up'}`}
                 >
                   <div className="relative shrink-0">
                     <img src={item.image} alt={item.name} className="w-24 h-24 object-cover rounded-2xl shadow-sm" />
                     {(item.isSpicy || item.selectedSpiciness === 'Spicy') && (
-                      <div className="absolute -top-2 -left-2 bg-red-600 text-white p-1 rounded-lg shadow-lg">
+                      <div className={`absolute -top-2 ${isAr ? '-right-2' : '-left-2'} bg-red-600 text-white p-1 rounded-lg shadow-lg`}>
                          <Flame size={12} fill="currentColor" />
                       </div>
                     )}
                   </div>
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-black text-gray-800 leading-tight text-sm md:text-base">{item.name}</h4>
+                      <div className={isAr ? 'text-right' : 'text-left'}>
+                        <h4 className={`font-black text-gray-800 leading-tight text-sm md:text-base ${isAr ? 'font-arabic' : ''}`}>{isAr ? item.nameAr : item.name}</h4>
                         <div className="flex flex-col gap-1">
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{item.nameAr}</p>
+                          {isAr ? null : <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{item.nameAr}</p>}
                           <div className="flex flex-wrap gap-2 mt-1">
                             {item.selectedSize && (
                               <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-900 text-white shadow-sm">
@@ -114,7 +132,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdat
                             )}
                             {item.selectedSpiciness && (
                               <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border ${item.selectedSpiciness === 'Spicy' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-100 text-slate-500 border-gray-200'}`}>
-                                {item.selectedSpiciness}
+                                {item.selectedSpiciness === 'Spicy' ? t.spicy : t.normal}
                               </span>
                             )}
                             {item.selectedModifiers && item.selectedModifiers.map(mod => (
@@ -173,15 +191,15 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdat
           <div className="p-8 bg-white border-t space-y-6 shadow-[0_-10px_20px_-15px_rgba(0,0,0,0.1)]">
             <div className="space-y-2">
               <div className="flex justify-between items-center text-gray-500 font-bold text-xs uppercase tracking-widest">
-                <span>Items Subtotal</span>
+                <span>{t.subtotal}</span>
                 <span className="text-gray-800 font-black">{subtotal} LE</span>
               </div>
               <div className="flex justify-between items-center text-gray-500 font-bold text-xs uppercase tracking-widest">
-                <span>Delivery</span>
-                <span className="text-green-600 font-black uppercase">Calculated at checkout</span>
+                <span>{t.delivery}</span>
+                <span className="text-green-600 font-black uppercase">{t.calcCheckout}</span>
               </div>
               <div className="flex justify-between items-center text-2xl font-black brand-font pt-3 border-t border-dashed border-gray-200 mt-2">
-                <span>TOTAL ESTIMATE</span>
+                <span>{t.totalEstimate}</span>
                 <span className="text-red-600 text-3xl animate-pop" key={subtotal}>
                   {subtotal} LE
                 </span>
@@ -191,8 +209,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onUpdat
               onClick={onCheckout}
               className="w-full bg-red-600 text-white font-black py-5 rounded-[2rem] shadow-2xl shadow-red-200 hover:bg-red-700 transition-all active:scale-95 text-lg tracking-widest flex items-center justify-center gap-3 group"
             >
-              GO TO CHECKOUT 
-              <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              {t.goCheckout} 
+              <ArrowRight size={20} className={`group-hover:translate-x-1 transition-transform ${isAr ? 'rotate-180 group-hover:-translate-x-1' : ''}`} />
             </button>
           </div>
         )}

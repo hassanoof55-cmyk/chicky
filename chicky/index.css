@@ -89,8 +89,28 @@ body {
 }
 
 @keyframes slideInRight {
-  from { transform: translateX(30px); opacity: 0; }
+  from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes exitRight {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes exitLeft {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-100%); opacity: 0; }
+}
+
+@keyframes scaleUp {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 @keyframes pop {
@@ -115,6 +135,26 @@ body {
 
 .animate-pop {
   animation: pop 0.4s var(--transition-normal) forwards;
+}
+
+.animate-slide-in {
+  animation: slideInRight 0.4s var(--transition-normal) forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.4s var(--transition-normal) forwards;
+}
+
+.animate-exit-right {
+  animation: exitRight 0.3s ease-in forwards;
+}
+
+.animate-exit-left {
+  animation: exitLeft 0.3s ease-in forwards;
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.3s var(--transition-normal) forwards;
 }
 
 .animate-progress {

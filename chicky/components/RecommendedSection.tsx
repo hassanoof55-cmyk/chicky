@@ -97,17 +97,17 @@ const RecommendedSection: React.FC<RecommendedSectionProps> = ({ title, items, o
                 decoding="async"
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
-              <div className="absolute top-2 right-2 bg-slate-900/90 backdrop-blur px-2.5 py-1 rounded-full shadow-xl flex flex-col items-end border border-white/5">
-                {item.originalPrice !== undefined && item.originalPrice > 0 && (
-                  <span className="text-[8px] text-white/20 line-through leading-none mb-0.5 font-bold">
-                    {item.originalPrice}
-                  </span>
+              <div className="absolute top-2 right-2 bg-slate-900/95 backdrop-blur-xl px-2 py-1.5 rounded-xl shadow-xl border border-white/5 flex items-center gap-2 z-10">
+                {item.originalPrice !== undefined && item.originalPrice > item.price && item.originalPrice > 0 && (
+                  <div className="flex items-center border-r border-white/10 pr-2">
+                    <span className="text-red-500 font-black text-[9px] line-through decoration-white/40 decoration-[1px]">{item.originalPrice}</span>
+                  </div>
                 )}
-                <div className="flex items-baseline gap-1">
-                  <span className="text-[7px] text-white/40 font-black uppercase tracking-widest">{lang === 'en' ? 'LE' : 'ج.م'}</span>
-                  <span className="text-[11px] font-black text-white leading-none">
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-[12px] font-black text-white leading-none">
                     {item.price}
                   </span>
+                  <span className="text-[6px] text-white/30 font-black uppercase">{lang === 'en' ? 'LE' : 'ج.م'}</span>
                 </div>
               </div>
             </div>
