@@ -413,6 +413,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
     syncConfig({ ...config, layout: newLayout });
   };
 
+  const moveArea = (index: number, direction: 'up' | 'down') => {
+    const newAreas = [...config.areas];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newAreas.length) return;
+
+    [newAreas[index], newAreas[targetIndex]] = [newAreas[targetIndex], newAreas[index]];
+    syncConfig({ ...config, areas: newAreas });
+  };
+
   const toggleProductTag = (tagName: string) => {
     if (!editingProduct) return;
     const currentTags = editingProduct.tags || [];
@@ -1182,6 +1191,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                             onClick={() => focusOnArea(area)}
                             className={`p-6 rounded-[2.5rem] border-2 transition-all cursor-pointer group flex items-center justify-between ${selectedAreaId === area.id ? 'bg-red-50 border-red-600 shadow-lg' : 'bg-slate-50 border-slate-100 hover:bg-white hover:border-slate-300'}`}>
                             <div className="flex items-center gap-5">
+                              <div className="flex flex-col gap-1">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); moveArea(config.areas.indexOf(area), 'up'); }}
+                                  disabled={config.areas.indexOf(area) === 0}
+                                  className="p-1 text-slate-300 hover:text-red-600 disabled:opacity-10"
+                                >
+                                  <ChevronUp size={16} />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); moveArea(config.areas.indexOf(area), 'down'); }}
+                                  disabled={config.areas.indexOf(area) === config.areas.length - 1}
+                                  className="p-1 text-slate-300 hover:text-red-600 disabled:opacity-10"
+                                >
+                                  <ChevronDown size={16} />
+                                </button>
+                              </div>
                               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${selectedAreaId === area.id ? 'bg-red-600 text-white shadow-xl shadow-red-100' : 'bg-white text-slate-400 border border-slate-100'}`}>
                                 <Navigation size={20} className={selectedAreaId === area.id ? '' : 'rotate-45'} />
                               </div>
@@ -1190,7 +1215,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{area.nameEn} • {area.fee} LE Fee</p>
                               </div>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); syncConfig({ ...config, areas: config.areas.filter(a => a.id !== area.id) }); refreshExistingZones(); }}
+                            <button onClick={(e) => { e.stopPropagation(); if(confirm('Delete area?')) syncConfig({ ...config, areas: config.areas.filter(a => a.id !== area.id) }); refreshExistingZones(); }}
                               className="p-3 text-slate-200 hover:text-red-600 hover:bg-white rounded-xl transition-all opacity-0 group-hover:opacity-100">
                               <Trash2 size={20} />
                             </button>

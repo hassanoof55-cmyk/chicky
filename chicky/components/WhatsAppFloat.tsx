@@ -31,7 +31,7 @@ const WhatsAppFloat: React.FC<WhatsAppFloatProps> = ({ phone, lang }) => {
   const whatsappUrl = `https://wa.me/${formatWhatsAppNumber(phone)}?text=${message}`;
 
   return (
-    <div className={`fixed bottom-28 md:bottom-8 ${isAr ? 'left-8' : 'right-8'} z-[100] group`}>
+    <div className={`fixed bottom-28 md:bottom-8 ${isAr ? 'left-8' : 'right-8'} z-40 group`}>
       {/* Label Tooltip */}
       <div className={`absolute bottom-full ${isAr ? 'left-0' : 'right-0'} mb-4 px-5 py-2.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 pointer-events-none shadow-2xl`}>
         {isAr ? 'اطلب عبر واتساب' : 'Order on WhatsApp'}

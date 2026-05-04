@@ -127,7 +127,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const EgyptianPhoneRegex = /^01[0125][0-9]{8}$/;
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, '').slice(0, 11);
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.startsWith('20') && val.length > 10) val = val.substring(2);
+    if (val.startsWith('1') && val.length === 10) val = '0' + val;
+    val = val.slice(0, 11);
+    
     setDetails({...details, phone: val});
     if (val.length === 11 && !EgyptianPhoneRegex.test(val)) {
       setPhoneError(isAr ? 'رقم مصري غير صحيح' : 'Invalid Egyptian number');
@@ -249,12 +253,19 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }, [step, locationMethod, isOpen, details.serviceType]);
 
   const handleAreaSelect = (area: Area) => {
-    setSelectedArea(area);
-    setIsOutOfRange(false);
-    if (area.points && area.points.length > 0) {
-      const center = area.points[0];
-      setLocation({ lat: center[0], lng: center[1] });
-      if (mapRef.current) mapRef.current.setView(center, 14);
+    try {
+      setSelectedArea(area);
+      setIsOutOfRange(false);
+      if (area.points && area.points.length > 0) {
+        const center = area.points[0];
+        setLocation({ lat: center[0], lng: center[1] });
+        // Only update map if we are in map mode and container exists
+        if (locationMethod === 'map' && mapRef.current && document.getElementById('map-container')) {
+          mapRef.current.setView(center, 14);
+        }
+      }
+    } catch (e) {
+      console.error('Area selection error:', e);
     }
   };
 
@@ -530,7 +541,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   {locationMethod === 'list' ? (
                     <div className="grid grid-cols-2 gap-3 max-h-[250px] overflow-y-auto no-scrollbar p-1">
                       {areas.map(area => (
-                        <button key={area.id} onClick={() => handleAreaSelect(area)} className={`p-4 rounded-2xl border-2 transition-all text-center flex flex-col items-center gap-2 group ${selectedArea?.id === area.id ? 'bg-red-600 border-red-600 text-white' : 'bg-slate-50 border-slate-100 hover:border-red-600'}`}>
+                        <button key={area.id} onClick={() => handleAreaSelect(area)} className={`p-4 rounded-2xl border-2 transition-all text-center flex flex-col items-center gap-2 group cursor-pointer pointer-events-auto ${selectedArea?.id === area.id ? 'bg-red-600 border-red-600 text-white' : 'bg-slate-50 border-slate-100 hover:border-red-600'}`}>
                            <span className="text-[10px] font-black uppercase tracking-widest">{isAr ? area.nameAr : area.nameEn}</span>
                         </button>
                       ))}
