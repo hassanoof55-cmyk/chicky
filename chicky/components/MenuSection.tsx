@@ -116,7 +116,7 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
                     {lang === 'en' ? 'Add Extras' : 'إضافات'}
                   </p>
                   <div className="grid grid-cols-1 gap-2">
-                     {currentItem.modifiers.map(mod => {
+                     {currentItem.modifiers?.map(mod => {
                         const isSelected = tempSelection.modifiers?.some(m => m.id === mod.id);
                         return (
                           <button 
@@ -151,7 +151,7 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-8">
-        {items.map((item) => {
+        {items?.map((item) => {
           const isAnimating = animatingId?.startsWith(item.id);
 
           return (

@@ -30,58 +30,55 @@ const App: React.FC = () => {
   const [promoCode, setPromoCode] = useState<PromoCode | null>(null);
   const [scheduledTime, setScheduledTime] = useState<string | null>(null);
 
-  const [activeCategory, setActiveCategory] = useState<string>(config.layout[0]?.id || 'cat_deals');
+  const [activeCategory, setActiveCategory] = useState<string>(config?.layout?.[0]?.id || 'cat_deals');
   const [lang, setLang] = useState<Language>('ar'); 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [showStickyMenu, setShowStickyMenu] = useState(false);
 
   const isAr = lang === 'ar';
 
 
 
 
+  // --- CLEAN DATA FETCHING & REAL-TIME ---
   useEffect(() => {
-    const fetchData = async () => {
+    const syncData = async () => {
       try {
-        // 1. Fetch Menu Items
-        const { data: menuData, error: menuError } = await supabase
-          .from('menu_items')
-          .select('*')
-          .order('created_at', { ascending: true });
-        
-        if (!menuError && menuData) {
+        // 1. Fetch Menu
+        const { data: menuData } = await supabase.from('menu_items').select('*').order('created_at', { ascending: true });
+        if (menuData && menuData.length > 0) {
           setMenu(menuData);
         }
 
-        // 2. Fetch Site Config
-        const { data: configData, error: configError } = await supabase
-          .from('site_settings')
-          .select('config_data')
-          .eq('id', 'active_config')
-          .single();
-        
-        if (!configError && configData?.config_data) {
-          setConfig(configData.config_data as SiteConfig);
+        // 2. Fetch Config
+        const { data: configData } = await supabase.from('site_settings').select('config_data').eq('id', 'active_config').single();
+        if (configData?.config_data) {
+          const fetched = configData.config_data as any;
+          setConfig(prev => ({
+            ...prev,
+            ...fetched,
+            // Fallback to initial values if specific keys are missing in DB
+            hero: fetched.hero || prev.hero,
+            header: fetched.header || prev.header,
+            footer: fetched.footer || prev.footer,
+            theme: fetched.theme || prev.theme,
+            layout: (fetched.layout && fetched.layout.length > 0) ? fetched.layout : prev.layout,
+            tags: (fetched.tags && fetched.tags.length > 0) ? fetched.tags : prev.tags
+          }));
         }
       } catch (err) {
-        console.error('Initial fetch failed:', err);
+        console.error('Sync failed:', err);
       }
     };
 
-    fetchData();
+    syncData();
 
-    // 3. Real-time Subscription for Site Settings
-    const channel = supabase
-      .channel('site_settings_changes')
-      .on('postgres_changes', 
-        { event: 'UPDATE', schema: 'public', table: 'site_settings', filter: 'id=eq.active_config' }, 
-        (payload) => {
-          if (payload.new && payload.new.config_data) {
-            setConfig(payload.new.config_data as SiteConfig);
-          }
-        }
-      )
+    // 3. Real-time Subscription (Instant Updates)
+    const channel = supabase.channel('chicky-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, syncData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, syncData)
       .subscribe();
 
     return () => {
@@ -89,23 +86,39 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Update document properties when config or language changes
+  // Update Page Direction, Title, and Brand Colors
   useEffect(() => {
-    document.documentElement.style.setProperty('--brand-red', config.theme.primaryColor);
-    document.documentElement.dir = isAr ? 'rtl' : 'ltr';
-    
-    // Update Favicon dynamically
-    const link: any = document.querySelector("link[rel*='icon']") || document.createElement('link');
-    link.type = 'image/png';
-    link.rel = 'shortcut icon';
-    link.href = config.header.logoRed;
-    if (!document.querySelector("link[rel*='icon']")) {
-       document.getElementsByTagName('head')[0].appendChild(link);
+    try {
+      const primaryColor = config.theme?.primaryColor || '#E4002B';
+      const logoRed = config.header?.logoRed || '';
+      
+      document.documentElement.style.setProperty('--brand-red', primaryColor);
+      document.documentElement.dir = isAr ? 'rtl' : 'ltr';
+      document.title = isAr ? 'تشيكي فرايد تشيكن | أقوى فرايد تشيكن' : 'Chicky Fried Chicken | Egypt\'s #1';
+      
+      if (logoRed) {
+        const link: any = document.querySelector("link[rel*='icon']") || document.createElement('link');
+        link.type = 'image/png'; link.rel = 'shortcut icon'; link.href = logoRed;
+        if (!document.querySelector("link[rel*='icon']")) document.getElementsByTagName('head')[0].appendChild(link);
+      }
+    } catch (e) {
+      console.error('Document update error:', e);
     }
-    
-    // Update Title
-    document.title = isAr ? 'تشيكي فرايد تشيكن | أقوى فرايد تشيكن' : 'Chicky Fried Chicken | Egypt\'s #1';
-  }, [config.theme.primaryColor, isAr, config.header.logoRed]);
+  }, [config.theme?.primaryColor, isAr, config.header?.logoRed]);
+
+  // Handle Sticky Menu on Scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowStickyMenu(true);
+      } else {
+        setShowStickyMenu(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
 
 
@@ -148,7 +161,7 @@ const App: React.FC = () => {
     }
     
     // Cross-sell logic
-    const cartCategories = new Set(cart.map(item => item.category));
+    const cartCategories = new Set(cart?.map(item => item.category) || []);
     const hasMainMeal = cartCategories.has('sandwiches') || cartCategories.has('cat_sandwiches') || 
                         cartCategories.has('family-meals') || cartCategories.has('cat_family') || 
                         cartCategories.has('deals') || cartCategories.has('cat_deals');
@@ -207,7 +220,7 @@ const App: React.FC = () => {
   };
 
   const updateQuantity = (id: string, delta: number, spiciness?: 'Normal' | 'Spicy', price?: number, sizeId?: string, modifiersJson?: string) => {
-    setCart(prev => prev.map(item => {
+    setCart(prev => prev?.map(item => {
       if (item.id === id && 
           item.selectedSpiciness === spiciness && 
           (price === undefined || item.price === price) &&
@@ -263,7 +276,24 @@ const App: React.FC = () => {
 
   return (
     <div className={`min-h-screen bg-mesh ${isAr ? 'font-arabic' : ''}`} dir={isAr ? 'rtl' : 'ltr'}>
-      <Navbar lang={lang} onSetLang={setLang} onOpenCart={() => setIsCartOpen(true)} cartCount={cartCount} onSearchChange={setSearchQuery} logoSrc={config.header.logoRed} tags={config.tags} activeTag={activeTag} onTagToggle={handleTagToggle} filterLabelEn={config.filterLabelEn} filterLabelAr={config.filterLabelAr} />
+      <Navbar 
+        lang={lang} 
+        onSetLang={setLang} 
+        onOpenCart={() => setIsCartOpen(true)} 
+        cartCount={cartCount} 
+        onSearchChange={setSearchQuery} 
+        logoSrc={config.header.logoRed} 
+        tags={config.tags} 
+        activeTag={activeTag} 
+        onTagToggle={handleTagToggle} 
+        filterLabelEn={config.filterLabelEn} 
+        filterLabelAr={config.filterLabelAr}
+        showSticky={showStickyMenu}
+        categories={config.layout}
+        activeCategory={activeCategory}
+        onCategoryClick={scrollToCategory}
+        hasItemsInCategory={(catId) => filteredMenu.some(p => p.category === catId)}
+      />
       
       {!activeTag && !searchQuery && (
         <HeroCarousel banners={config.hero.banners} isAr={isAr} onCategoryClick={scrollToCategory} />
@@ -314,10 +344,10 @@ const App: React.FC = () => {
           <RecommendedSection title={recommendationTitle} items={recommendations} onAddToCart={addToCart} lang={lang} />
         )}
         
-        {config.layout.length > 0 && (
+        {config.layout.length > 0 && !showStickyMenu && (
           <div className="sticky top-[73px] md:top-[88px] z-40 bg-white/90 glass -mx-6 px-6 py-5 md:-mx-12 md:px-12 border-b border-gray-100 mb-12 overflow-x-auto no-scrollbar shadow-sm">
             <div className="flex gap-4 min-w-max items-center">
-              {config.layout.map(cat => {
+              {config?.layout?.map(cat => {
                 const hasItems = filteredMenu.some(p => p.category === cat.id);
                 if (!hasItems) return null;
                 return (
@@ -338,7 +368,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {config.layout.map((cat) => {
+        {config?.layout?.map((cat) => {
           const catItems = filteredMenu.filter(p => p.category === cat.id);
           if (catItems.length === 0) return null;
           return <MenuSection key={cat.id} category={cat} items={catItems} onAddToCart={addToCart} lang={lang} tagsConfig={config.tags} />;

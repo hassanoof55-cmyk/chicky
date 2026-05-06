@@ -74,7 +74,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        const mappedOrders = data.map(o => ({
+        const mappedOrders = data?.map(o => ({
           id: o.id,
           customerName: o.customer_name,
           phone: o.phone,
@@ -154,7 +154,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
       areaStats[area].revenue += order.totalPrice;
 
       // Item Stats
-      order.items.forEach(item => {
+      order.items?.forEach(item => {
         itemStats[item.name] = (itemStats[item.name] || 0) + item.quantity;
       });
     });
@@ -242,7 +242,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const refreshExistingZones = () => {
     if (!existingZonesLayerRef.current) return;
     existingZonesLayerRef.current.clearLayers();
-    config.areas.forEach(area => {
+    config?.areas?.forEach(area => {
       if (area.points && area.points.length > 0) {
         const poly = L.polygon(area.points, {
           color: selectedAreaId === area.id ? config.theme.primaryColor : '#475569',
@@ -317,7 +317,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
       // Update local state after successful Supabase save
       let newMenu: Product[];
       if (editingProduct.id) {
-        newMenu = menu.map(p => p.id === editingProduct.id ? productToSave as Product : p);
+        newMenu = menu?.map(p => p.id === editingProduct.id ? productToSave as Product : p);
       } else {
         newMenu = [...menu, productToSave as Product];
       }
@@ -405,7 +405,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   };
 
   const moveCategory = (index: number, direction: 'up' | 'down') => {
-    const newLayout = [...config.layout];
+    const newLayout = [...(config?.layout || [])];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= newLayout.length) return;
     
@@ -414,7 +414,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   };
 
   const moveArea = (index: number, direction: 'up' | 'down') => {
-    const newAreas = [...config.areas];
+    const newAreas = [...(config?.areas || [])];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= newAreas.length) return;
 
@@ -543,9 +543,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                         // Create CSV content with UTF-8 BOM for Arabic support
                         const csvRows = [
                           headers.join(','),
-                          ...filtered.map(o => {
+                          ...filtered?.map(o => {
                             const statusLabel = o.status === 'pending' ? 'قيد التنفيذ' : o.status === 'completed' ? 'تم التوصيل' : 'ملغي';
-                            const itemsList = o.items.map(i => `${i.name} (x${i.quantity})`).join(' | ');
+                            const itemsList = o.items?.map(i => `${i.name} (x${i.quantity})`).join(' | ') || '';
                             
                             // Escape commas and quotes for CSV
                             return [
@@ -614,7 +614,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                      <MapIcon size={20} className="text-red-600" /> Orders per Area Breakdown
                    </h4>
                    <div className="space-y-4">
-                      {Object.entries(stats.areaStats).map(([area, data]) => (
+                      {Object.entries(stats.areaStats || {})?.map(([area, data]) => (
                         <div key={area} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all">
                            <span className="font-black text-slate-900 text-sm uppercase">{area}</span>
                            <div className="flex items-center gap-8">
@@ -637,12 +637,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
-                  {orders.length === 0 ? (
+                  {orders?.length === 0 ? (
                     <div className="bg-white p-20 rounded-[3.5rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-slate-300 italic">
                       No orders recorded yet.
                     </div>
                   ) : (
-                    orders.map(order => (
+                    orders?.map(order => (
                       <div key={order.id} className="bg-white p-10 rounded-[4rem] border-2 border-slate-50 shadow-sm hover:border-red-600 transition-all flex flex-col gap-8">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b pb-8">
                           <div className="flex items-center gap-6">
@@ -705,7 +705,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                               <Layout size={14} className="text-red-600" /> Order Summary
                             </h5>
                             <div className="bg-slate-50 rounded-3xl p-6 space-y-4">
-                              {order.items.map((item, idx) => (
+                              {order.items?.map((item, idx) => (
                                 <div key={idx} className="flex justify-between items-center text-sm">
                                   <div className="flex items-center gap-3">
                                     <span className="w-7 h-7 bg-white rounded-lg flex items-center justify-center font-black text-[10px] border border-slate-100">{item.quantity}x</span>
@@ -727,7 +727,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                           <button onClick={async () => {
                             const { error } = await supabase.from('orders').update({ status: 'completed' }).eq('id', order.id);
                             if (!error) {
-                              setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'completed' as const } : o));
+                              setOrders(prev => prev?.map(o => o.id === order.id ? { ...o, status: 'completed' as const } : o));
                             }
                           }} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-green-600 transition-all active:scale-95 shadow-lg">Mark as Completed</button>
 
@@ -758,8 +758,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {menu.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.nameAr.includes(searchTerm)).map(product => {
-                    const cat = config.layout.find(c => c.id === product.category);
+                  {menu?.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.nameAr.includes(searchTerm)).map(product => {
+                    const cat = config?.layout?.find(c => c.id === product.category);
                     const hasDiscount = product.originalPrice && product.originalPrice > product.price;
                     return (
                       <div key={product.id} className="bg-white p-8 rounded-[3.5rem] border-2 border-slate-50 flex flex-col sm:flex-row items-center gap-10 group hover:border-red-600 transition-all shadow-sm relative overflow-hidden">
@@ -823,7 +823,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Optional - Select sections to apply discount</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {config.layout.map(cat => {
+                      {config?.layout?.map(cat => {
                         const isSelected = newPromo.applicable_categories?.includes(cat.id);
                         return (
                           <button
@@ -849,7 +849,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Optional - Select individual products</p>
                     </div>
                     <div className="max-h-64 overflow-y-auto no-scrollbar grid grid-cols-1 gap-2 p-4 bg-slate-50 rounded-3xl border border-slate-100">
-                      {menu.map(p => {
+                      {menu?.map(p => {
                         const isSelected = newPromo.applicable_products?.includes(p.id);
                         return (
                           <button
@@ -885,7 +885,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
 
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-10">
-                  {promoCodes.map(pc => (
+                  {promoCodes?.map(pc => (
                     <div key={pc.code} className="bg-white p-10 rounded-[3.5rem] shadow-xl border border-slate-100 flex flex-col justify-between">
                       <div className="flex justify-between items-start mb-10">
                         <div className="p-4 bg-slate-50 rounded-2xl"><TagIcon size={24} className="text-red-600" /></div>
@@ -910,18 +910,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                         </div>
                         {pc.applicable_categories && pc.applicable_categories.length > 0 && (
                           <div className="mt-4 flex flex-wrap gap-2">
-                             {pc.applicable_categories.map((catId: string) => (
+                             {pc.applicable_categories?.map((catId: string) => (
                                <span key={catId} className="bg-red-50 text-red-600 text-[8px] font-black px-3 py-1 rounded-lg border border-red-100">
-                                 {config.layout.find(c => c.id === catId)?.nameEn || catId}
+                                 {config?.layout?.find(c => c.id === catId)?.nameEn || catId}
                                </span>
                              ))}
                           </div>
                         )}
                         {pc.applicable_products && pc.applicable_products.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-2">
-                             {pc.applicable_products.map((prodId: string) => (
+                             {pc.applicable_products?.map((prodId: string) => (
                                <span key={prodId} className="bg-slate-950 text-white text-[8px] font-black px-3 py-1 rounded-lg">
-                                 {menu.find(p => p.id === prodId)?.name || prodId}
+                                 {menu?.find(p => p.id === prodId)?.name || prodId}
                                </span>
                              ))}
                           </div>
@@ -987,7 +987,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                           className="bg-red-600 text-white px-10 rounded-[2rem] py-5 font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-red-200">New Offer</button>
                       </div>
                       <div className="grid grid-cols-1 gap-6">
-                        {config.hero.banners.map(b => (
+                        {config?.hero?.banners?.map(b => (
                           <div key={b.id} className="bg-white p-10 rounded-[3.5rem] border-2 border-slate-50 flex flex-col md:flex-row items-center justify-between shadow-sm group hover:border-red-600 transition-all">
                             <div className="flex flex-col md:flex-row items-center gap-10">
                               <div className="relative shrink-0">
@@ -996,7 +996,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                               <div className="text-center md:text-left">
                                 <h5 className="font-black text-xl text-slate-900 uppercase leading-none mb-2">Campaign Slide</h5>
                                 <p className="text-xs font-bold text-red-600 flex items-center gap-2 justify-center md:justify-start">
-                                  Linked to: {config.layout.find(c => c.id === b.targetCategoryId)?.nameEn || 'No Link'}
+                                  Linked to: {config?.layout?.find(c => c.id === b.targetCategoryId)?.nameEn || 'No Link'}
                                 </p>
                               </div>
                             </div>
@@ -1021,7 +1021,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                           </div>
                         </div>
                         <div className="space-y-4 pt-6">
-                          {config.layout.map((cat, idx) => (
+                          {config?.layout?.map((cat, idx) => (
                             <div key={cat.id} className="flex items-center justify-between p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 group hover:bg-white transition-all shadow-sm">
                               <div className="flex items-center gap-6">
                                 <span className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center font-black text-xs text-red-600 border-2 border-slate-100 shadow-sm">{idx + 1}</span>
@@ -1095,7 +1095,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                                 {config.branchStatus === 'open' ? 'لا يوجد وسوم مضافة حالياً. استخدم الحقول أعلاه لإضافة وسم جديد.' : 'No tags added yet. Use the fields above to create labels.'}
                               </div>
                             )}
-                            {config.tags.map((tag) => (
+                            {(config?.tags || []).map((tag) => (
                               <div key={tag.id} className="flex items-center justify-between p-6 bg-white rounded-[2rem] border-2 border-slate-50 hover:border-red-100 transition-all group">
                                 <div className="flex items-center gap-4">
                                   <div className="p-3 bg-slate-50 rounded-xl text-slate-400 group-hover:text-red-600 transition-colors">
@@ -1186,7 +1186,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                           <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Active Corridors ({config.areas.length})</span>
                           <BarChart3 size={16} className="text-slate-300" />
                         </div>
-                        {config.areas.map(area => (
+                        {config?.areas?.map(area => (
                           <div key={area.id}
                             onClick={() => focusOnArea(area)}
                             className={`p-6 rounded-[2.5rem] border-2 transition-all cursor-pointer group flex items-center justify-between ${selectedAreaId === area.id ? 'bg-red-50 border-red-600 shadow-lg' : 'bg-slate-50 border-slate-100 hover:bg-white hover:border-slate-300'}`}>
@@ -1326,7 +1326,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                     <div><label className={labelStyle}>Selling Price (LE)</label><input type="number" className={inputStyle + " text-3xl font-black text-red-600"} value={editingProduct.price} onChange={e => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })} required /></div>
                     <div><label className={labelStyle}>Instead of (Old Price)</label><input type="number" className={inputStyle + " text-xl text-slate-300 font-bold"} value={editingProduct.originalPrice || ''} placeholder="LE" onChange={e => setEditingProduct({ ...editingProduct, originalPrice: Number(e.target.value) })} /></div>
                   </div>
-                  <div><label className={labelStyle}>Category</label><select className={inputStyle} value={editingProduct.category} onChange={e => setEditingProduct({ ...editingProduct, category: e.target.value })}>{config.layout.map(c => <option key={c.id} value={c.id}>{c.nameEn}</option>)}</select></div>
+                  <div><label className={labelStyle}>Category</label><select className={inputStyle} value={editingProduct.category} onChange={e => setEditingProduct({ ...editingProduct, category: e.target.value })}>{config?.layout?.map(c => <option key={c.id} value={c.id}>{c.nameEn}</option>)}</select></div>
                 </div>
               </div>
 
@@ -1337,7 +1337,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                   <h4 className="text-lg font-black brand-font uppercase tracking-tight text-slate-900">Product Labels & Badges</h4>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  {config.tags.map(tag => {
+                  {config?.tags?.map(tag => {
                     const isActive = editingProduct.tags?.includes(tag.nameEn);
                     return (
                       <button
@@ -1504,7 +1504,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                       onChange={e => setEditingBanner({ ...editingBanner, targetCategoryId: e.target.value })}
                     >
                       <option value="">No Link (Visual Only)</option>
-                      {config.layout.map(c => <option key={c.id} value={c.id}>{c.nameEn} / {c.nameAr}</option>)}
+                      {config?.layout?.map(c => <option key={c.id} value={c.id}>{c.nameEn} / {c.nameAr}</option>)}
                     </select>
                     <p className="mt-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest">When a customer clicks this banner, they will be scrolled to this category.</p>
                   </div>
@@ -1602,7 +1602,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                          </tr>
                       </thead>
                       <tbody>
-                         {Object.entries(stats.areaStats).map(([area, data]) => (
+                         {Object.entries(stats.areaStats || {})?.map(([area, data]) => (
                             <tr key={area} className="border-b border-slate-100">
                                <td className="py-3 text-xs font-bold uppercase">{area}</td>
                                <td className="py-3 text-xs font-medium text-center">{data.count}</td>
@@ -1623,7 +1623,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
                          </tr>
                       </thead>
                       <tbody>
-                         {Object.entries(stats.topItem ? { [stats.topItem[0]]: stats.topItem[1] } : {}).map(([name, qty]) => (
+                         {Object.entries(stats.topItem ? { [stats.topItem[0]]: stats.topItem[1] } : {})?.map(([name, qty]) => (
                             <tr key={name} className="border-b border-slate-50">
                                <td className="py-3 text-xs font-bold uppercase">{name}</td>
                                <td className="py-3 text-xs font-black text-right">{qty} Units</td>

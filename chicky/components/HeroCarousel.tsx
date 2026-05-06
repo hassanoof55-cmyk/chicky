@@ -16,12 +16,12 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ banners, isAr, onCategoryCl
   const minSwipeDistance = 50;
 
   const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % banners.length);
-  }, [banners.length]);
+    setCurrentIndex((prev) => (prev + 1) % (banners?.length || 1));
+  }, [banners?.length]);
 
   const prevSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev - 1 + banners.length) % banners.length);
-  }, [banners.length]);
+    setCurrentIndex((prev) => (prev - 1 + (banners?.length || 1)) % (banners?.length || 1));
+  }, [banners?.length]);
 
   const goToSlide = (index: number) => {
     setCurrentIndex(index);
@@ -56,14 +56,14 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ banners, isAr, onCategoryCl
   };
 
   useEffect(() => {
-    if (banners.length <= 1 || isPaused) return;
+    if (!banners || banners.length <= 1 || isPaused) return;
     
     const interval = setInterval(() => {
       nextSlide();
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [banners.length, isPaused, nextSlide]);
+  }, [banners?.length, isPaused, nextSlide]);
 
   if (!banners || banners.length === 0) return null;
 
@@ -81,15 +81,15 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ banners, isAr, onCategoryCl
         <div 
           className="flex h-full transition-transform duration-[1200ms] ease-[cubic-bezier(0.23,1,0.32,1)]"
           style={{ 
-            transform: `translateX(${isAr ? currentIndex * (100 / banners.length) : -currentIndex * (100 / banners.length)}%)`,
-            width: `${banners.length * 100}%`
+            transform: `translateX(${isAr ? currentIndex * (100 / (banners?.length || 1)) : -currentIndex * (100 / (banners?.length || 1))}%)`,
+            width: `${(banners?.length || 1) * 100}%`
           }}
         >
-          {banners.map((banner, idx) => (
+          {banners?.map((banner, idx) => (
             <div 
               key={banner.id} 
               className={`h-full relative flex-shrink-0 overflow-hidden ${banner.targetCategoryId ? 'cursor-pointer' : ''}`}
-              style={{ width: `${100 / banners.length}%` }}
+              style={{ width: `${100 / (banners?.length || 1)}%` }}
               onClick={() => banner.targetCategoryId && onCategoryClick(banner.targetCategoryId)}
             >
               <img 
@@ -107,9 +107,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ banners, isAr, onCategoryCl
         </div>
 
         {/* Pagination Dots */}
-        {banners.length > 1 && (
+        {(banners?.length || 0) > 1 && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
-            {banners.map((_, idx) => (
+            {banners?.map((_, idx) => (
               <button
                 key={idx}
                 onClick={() => goToSlide(idx)}

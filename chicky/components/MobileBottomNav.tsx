@@ -49,7 +49,7 @@ const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             </div>
             
             <div className="grid grid-cols-1 gap-2 max-h-[50vh] overflow-y-auto no-scrollbar pb-4">
-              {categories.map(cat => (
+              {categories?.map(cat => (
                 <button 
                   key={cat.id}
                   onClick={() => handleCatClick(cat.id)}

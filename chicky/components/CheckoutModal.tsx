@@ -83,7 +83,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const timeInputRef = useRef<HTMLInputElement>(null);
-  const areas = config.areas || [];
+  const areas = config?.areas || [];
 
   const isAr = lang === 'ar';
 
@@ -282,7 +282,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
 
     // Calculate subtotal for eligible items only
-    const eligibleSubtotal = cartItems.reduce((acc, item) => {
+    const eligibleSubtotal = cartItems?.reduce((acc, item) => {
       const isCategoryEligible = appliedPromo.applicableCategories?.includes(item.category);
       const isProductEligible = appliedPromo.applicableProducts?.includes(item.id);
       
@@ -290,7 +290,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         return acc + (item.price * item.quantity);
       }
       return acc;
-    }, 0);
+    }, 0) || 0;
 
     return appliedPromo.discountType === 'percentage'
       ? (eligibleSubtotal * appliedPromo.discountValue / 100)
@@ -357,13 +357,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         address: `${details.address} [Payment: ${paymentMethod?.toUpperCase()}]`,
         area: selectedArea ? (isAr ? selectedArea.nameAr : selectedArea.nameEn) : 'Pickup/Dine-In',
         location: details.serviceType === 'delivery' ? location : {},
-        items: cartItems.map(item => ({
+        items: cartItems?.map(item => ({
           name: isAr ? item.nameAr : item.name,
           quantity: item.quantity,
           price: item.price,
           spiciness: item.selectedSpiciness,
           size: item.selectedSize ? (isAr ? item.selectedSize.nameAr : item.selectedSize.nameEn) : null
-        })),
+        })) || [],
         total_price: finalTotal,
         status: 'pending'
       }]);
@@ -418,10 +418,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
 
     msg += `\n*Items:*\n`;
-    cartItems.forEach(item => {
+    cartItems?.forEach(item => {
       const sizeStr = item.selectedSize ? ` [${item.selectedSize.nameEn}]` : '';
       const spicyStr = item.selectedSpiciness ? ` (${item.selectedSpiciness})` : '';
-      const extrasStr = (item.selectedModifiers || []).length > 0 ? ` + ${item.selectedModifiers?.map(m => m.nameEn).join(', ')}` : '';
+      const extrasStr = (item.selectedModifiers || [])?.length > 0 ? ` + ${item.selectedModifiers?.map(m => m.nameEn).join(', ')}` : '';
       msg += `• ${item.quantity}x ${item.name}${sizeStr}${spicyStr}${extrasStr}\n`;
     });
 
@@ -540,7 +540,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                   {locationMethod === 'list' ? (
                     <div className="grid grid-cols-2 gap-3 max-h-[250px] overflow-y-auto no-scrollbar p-1">
-                      {areas.map(area => (
+                      {areas?.map(area => (
                         <button key={area.id} onClick={() => handleAreaSelect(area)} className={`p-4 rounded-2xl border-2 transition-all text-center flex flex-col items-center gap-2 group cursor-pointer pointer-events-auto ${selectedArea?.id === area.id ? 'bg-red-600 border-red-600 text-white' : 'bg-slate-50 border-slate-100 hover:border-red-600'}`}>
                            <span className="text-[10px] font-black uppercase tracking-widest">{isAr ? area.nameAr : area.nameEn}</span>
                         </button>
@@ -565,7 +565,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         {/* Suggestions Dropdown */}
                         {showMapResults && mapSearchResults.length > 0 && (
                           <div className="absolute top-full left-0 right-0 z-[100] mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-reveal">
-                            {mapSearchResults.map((res, i) => (
+                            {mapSearchResults?.map((res, i) => (
                               <button
                                 key={i}
                                 onClick={() => selectSearchResult(res)}
@@ -663,7 +663,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                    </span>
                 </div>
                 <div className="space-y-4 max-h-[200px] overflow-y-auto no-scrollbar px-2">
-                   {cartItems.map((item, idx) => (
+                   {cartItems?.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-start">
                          <div>
                             <p className="text-sm font-black text-slate-900 uppercase leading-none">{item.quantity}x {isAr ? item.nameAr : item.name}</p>
