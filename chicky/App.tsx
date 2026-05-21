@@ -344,8 +344,8 @@ const App: React.FC = () => {
           <RecommendedSection title={recommendationTitle} items={recommendations} onAddToCart={addToCart} lang={lang} />
         )}
         
-        {config.layout.length > 0 && !showStickyMenu && (
-          <div className="sticky top-[73px] md:top-[88px] z-40 bg-white/90 glass -mx-6 px-6 py-5 md:-mx-12 md:px-12 border-b border-gray-100 mb-12 overflow-x-auto no-scrollbar shadow-sm">
+        {config.layout.length > 0 && (
+          <div className="bg-white/90 glass -mx-6 px-6 py-5 md:-mx-12 md:px-12 border-b border-gray-100 mb-12 overflow-x-auto no-scrollbar shadow-sm">
             <div className="flex gap-4 min-w-max items-center">
               {config?.layout?.map(cat => {
                 const hasItems = filteredMenu.some(p => p.category === cat.id);

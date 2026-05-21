@@ -41,66 +41,64 @@ const Navbar: React.FC<NavbarProps> = ({
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   return (
-    <nav className={`sticky top-0 z-50 glass border-b border-white/20 shadow-lg shadow-slate-200/50 ${showSticky ? 'animate-slide-down' : ''}`}>
-      {/* Main Nav Row - Hidden when sticky to only show categories */}
-      {!showSticky && (
-        <div className="px-4 py-3 md:px-8 max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div
-            className="flex items-center cursor-pointer hover:scale-105 transition-transform"
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          >
-            <Logo src={logoSrc} className="h-10 md:h-12" />
-          </div>
+    <nav className="sticky top-0 z-50 glass border-b border-white/20 shadow-lg shadow-slate-200/50">
+      {/* Main Nav Row - Always visible to ensure search and cart are accessible */}
+      <div className="px-4 py-3 md:px-8 max-w-7xl mx-auto flex items-center justify-between gap-4">
+        <div
+          className="flex items-center cursor-pointer hover:scale-105 transition-transform"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        >
+          <Logo src={logoSrc} className="h-10 md:h-12" />
+        </div>
 
-          {/* Desktop Search */}
-          <div className="hidden md:flex flex-1 max-w-lg mx-4">
-            <div className="relative w-full group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-red-500 transition-colors" size={18} />
-              <input
-                type="text"
-                placeholder={lang === 'en' ? "What are you craving?" : "بماذا تشعر بالجوع؟"}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="w-full bg-slate-100/50 border-2 border-transparent rounded-2xl py-2.5 pl-11 pr-4 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/10 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 md:gap-4">
-            {/* Mobile Search Toggle */}
-            <button
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="md:hidden p-2.5 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-            >
-              <Search size={22} />
-            </button>
-
-            <button
-              onClick={() => onSetLang(lang === 'en' ? 'ar' : 'en')}
-              className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:text-red-600 font-black text-[10px] uppercase transition-all tracking-widest shrink-0 bg-slate-100 md:bg-transparent rounded-xl"
-            >
-              <Globe size={16} />
-              <span>{lang === 'en' ? 'AR' : 'EN'}</span>
-            </button>
-
-            <button
-              id="cart-btn"
-              onClick={onOpenCart}
-              className="group relative p-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-all shadow-xl shadow-red-200 hover:scale-105 active:scale-95 shrink-0"
-            >
-              <ShoppingCart size={20} />
-              {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-black text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white animate-pop">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-
-            <button className="md:hidden text-slate-600 p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
-              <Menu size={22} />
-            </button>
+        {/* Desktop Search */}
+        <div className="hidden md:flex flex-1 max-w-lg mx-4">
+          <div className="relative w-full group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-red-500 transition-colors" size={18} />
+            <input
+              type="text"
+              placeholder={lang === 'en' ? "What are you craving?" : "بماذا تشعر بالجوع؟"}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="w-full bg-slate-100/50 border-2 border-transparent rounded-2xl py-2.5 pl-11 pr-4 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/10 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
+            />
           </div>
         </div>
-      )}
+
+        <div className="flex items-center gap-2 md:gap-4">
+          {/* Mobile Search Toggle */}
+          <button
+            onClick={() => setIsSearchOpen(!isSearchOpen)}
+            className="md:hidden p-2.5 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+          >
+            <Search size={22} />
+          </button>
+
+          <button
+            onClick={() => onSetLang(lang === 'en' ? 'ar' : 'en')}
+            className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:text-red-600 font-black text-[10px] uppercase transition-all tracking-widest shrink-0 bg-slate-100 md:bg-transparent rounded-xl"
+          >
+            <Globe size={16} />
+            <span>{lang === 'en' ? 'AR' : 'EN'}</span>
+          </button>
+
+          <button
+            id="cart-btn"
+            onClick={onOpenCart}
+            className="group relative p-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-all shadow-xl shadow-red-200 hover:scale-105 active:scale-95 shrink-0"
+          >
+            <ShoppingCart size={20} />
+            {cartCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-black text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white animate-pop">
+                {cartCount}
+              </span>
+            )}
+          </button>
+
+          <button className="md:hidden text-slate-600 p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
+            <Menu size={22} />
+          </button>
+        </div>
+      </div>
 
       {/* Mobile Search Expandable */}
       {isSearchOpen && (
@@ -122,7 +120,7 @@ const Navbar: React.FC<NavbarProps> = ({
       <div className="bg-white/50 border-t border-slate-100 px-4 py-3 overflow-x-auto no-scrollbar mask-edge">
         <div className="max-w-7xl mx-auto flex items-center gap-3">
           {!showSticky ? (
-            <>
+            <div key="tags" className="flex items-center gap-2 animate-scale-up w-full">
               <div className="flex items-center gap-2 px-3 border-e border-slate-200 shrink-0">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
                   {lang === 'en' ? (filterLabelEn || 'Filters') : (filterLabelAr || 'تصفية')}
@@ -151,9 +149,9 @@ const Navbar: React.FC<NavbarProps> = ({
                   </button>
                 )}
               </div>
-            </>
+            </div>
           ) : (
-            <div className="flex gap-3 min-w-max items-center">
+            <div key="categories" className="flex gap-3 min-w-max items-center animate-scale-up">
               {categories?.map(cat => {
                 const hasItems = hasItemsInCategory ? hasItemsInCategory(cat.id) : true;
                 if (!hasItems) return null;

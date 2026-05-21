@@ -21,7 +21,7 @@ const Footer: React.FC<FooterProps> = ({ config, lang, onOpenAdmin, scrollToCate
   const isAr = lang === 'ar';
 
   return (
-    <footer className="bg-slate-950 text-white pt-24 pb-12 border-t-8 border-red-600">
+    <footer className="bg-slate-950 text-white pt-24 pb-32 md:pb-12 border-t-8 border-red-600">
       <div className="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-4 gap-16 border-b border-white/5 pb-20">
         <div className="space-y-8">
           <Logo src={config.header.logoWhite} className="h-16" />

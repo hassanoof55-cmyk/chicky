@@ -106,7 +106,10 @@ export interface PromoCode {
   minOrderValue?: number;
   applicableCategories?: string[]; // IDs of categories this code applies to
   applicableProducts?: string[];   // IDs of specific products this code applies to
+  usageLimit?: number | null;
+  expiryDate?: string | null;
 }
+
 
 export interface UserProfile {
   id: string;
