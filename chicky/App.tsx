@@ -11,15 +11,17 @@ import Footer from './components/Footer';
 import WhatsAppFloat from './components/WhatsAppFloat';
 import HeroCarousel from './components/HeroCarousel';
 import MobileBottomNav from './components/MobileBottomNav';
-import { getStoredMenu, saveMenuToStorage, getStoredConfig, saveConfigToStorage } from './data/menuData';
+import StorefrontLoading from './components/StorefrontLoading';
+import { EMPTY_CONFIG, loadStorefront } from './lib/storefrontData';
 import { Product, CartItem, Language, OrderDetails, SiteConfig, ServiceType, PromoCode } from './types';
 import { supabase } from './lib/supabase';
 // Added Search to the lucide-react imports
 import { ArrowRight, Sparkles, Zap, Tag, Tag as TagIcon, X, Search, Flame } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [menu, setMenu] = useState<Product[]>(getStoredMenu());
-  const [config, setConfig] = useState<SiteConfig>(getStoredConfig());
+  const [menu, setMenu] = useState<Product[]>([]);
+  const [config, setConfig] = useState<SiteConfig>(EMPTY_CONFIG);
+  const [dataStatus, setDataStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -44,32 +46,29 @@ const App: React.FC = () => {
 
   // --- CLEAN DATA FETCHING & REAL-TIME ---
   useEffect(() => {
+    let active = true;
+    let inFlight = false;
+    let pending = false;
     const syncData = async () => {
+      if (inFlight) { pending = true; return; }
+      inFlight = true;
       try {
-        // 1. Fetch Menu
-        const { data: menuData } = await supabase.from('menu_items').select('*').order('created_at', { ascending: true });
-        if (menuData && menuData.length > 0) {
-          setMenu(menuData);
-        }
-
-        // 2. Fetch Config
-        const { data: configData } = await supabase.from('site_settings').select('config_data').eq('id', 'active_config').single();
-        if (configData?.config_data) {
-          const fetched = configData.config_data as any;
-          setConfig(prev => ({
-            ...prev,
-            ...fetched,
-            // Fallback to initial values if specific keys are missing in DB
-            hero: fetched.hero || prev.hero,
-            header: fetched.header || prev.header,
-            footer: fetched.footer || prev.footer,
-            theme: fetched.theme || prev.theme,
-            layout: (fetched.layout && fetched.layout.length > 0) ? fetched.layout : prev.layout,
-            tags: (fetched.tags && fetched.tags.length > 0) ? fetched.tags : prev.tags
-          }));
-        }
+        const fetched = await loadStorefront(supabase);
+        if (!active) return;
+        setMenu(fetched.menu);
+        setConfig(fetched.config);
+        setDataStatus('ready');
       } catch (err) {
+        if (!active) return;
         console.error('Sync failed:', err);
+        setMenu([]);
+        setConfig(EMPTY_CONFIG);
+        setCart([]);
+        setIsCheckoutOpen(false);
+        setDataStatus('error');
+      } finally {
+        inFlight = false;
+        if (pending && active) { pending = false; void syncData(); }
       }
     };
 
@@ -82,6 +81,7 @@ const App: React.FC = () => {
       .subscribe();
 
     return () => {
+      active = false;
       supabase.removeChannel(channel);
     };
   }, []);
@@ -124,12 +124,10 @@ const App: React.FC = () => {
 
   const updateMenu = (newMenu: Product[]) => {
     setMenu(newMenu);
-    saveMenuToStorage(newMenu);
   };
 
   const updateConfig = (newConfig: SiteConfig) => {
     setConfig(newConfig);
-    saveConfigToStorage(newConfig);
   };
 
   const filteredMenu = useMemo(() => {
@@ -274,6 +272,10 @@ const App: React.FC = () => {
     setIsAdminOpen(true);
   };
 
+  if (dataStatus !== 'ready') {
+    return <StorefrontLoading failed={dataStatus === 'error'} />;
+  }
+
   return (
     <div className={`min-h-screen bg-mesh ${isAr ? 'font-arabic' : ''}`} dir={isAr ? 'rtl' : 'ltr'}>
       <Navbar 
@@ -386,7 +388,7 @@ const App: React.FC = () => {
       </main>
 
       <Footer config={config} lang={lang} onOpenAdmin={handleOpenAdmin} scrollToCategory={scrollToCategory} />
-      <WhatsAppFloat phone={config.header.phone} lang={lang} />
+      {config.header.phone && <WhatsAppFloat phone={config.header.phone} lang={lang} />}
       <MobileBottomNav 
         onOpenCart={() => setIsCartOpen(true)} 
         cartCount={cartCount} 

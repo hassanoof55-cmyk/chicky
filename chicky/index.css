@@ -2,6 +2,30 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&family=Cairo:wght@400;700;900&family=Changa:wght@400;700;800;900&display=swap');
 
+.storefront-loading {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background: radial-gradient(ellipse at 15% 10%, #fcf3f5 0, transparent 62%), #fafbfc;
+}
+.storefront-loading__content { width: min(100%, 420px); text-align: center; }
+.storefront-loading__logo { display: block; width: 120px; height: auto; margin: 0 auto 54px; }
+.storefront-loading__name { margin: 0 0 4px; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 24px; line-height: 1; letter-spacing: -1px; color: #0f172a; }
+.storefront-loading__caption { margin: 0; font-family: Inter, sans-serif; font-size: 10px; font-weight: 800; line-height: 1.8; letter-spacing: 4px; color: #64748b; }
+.storefront-loading__pulse { animation: storefront-pulse 2s ease-in-out infinite; }
+.storefront-loading__dots { display: inline-block; animation: storefront-pulse 1.5s ease-in-out infinite; }
+.storefront-loading__error { margin-top: 16px; font-family: Cairo, sans-serif; color: #475569; font-size: 14px; line-height: 1.8; }
+.storefront-loading__hint { margin-top: 4px; font-size: 12px; }
+.storefront-loading__retry { margin-top: 20px; padding: 10px 24px; min-height: 44px; border: 1px solid #fecdd3; border-radius: 12px; background: #fff; color: #be123c; font: inherit; font-weight: 700; cursor: pointer; }
+.storefront-loading__retry:hover { background: #fff1f2; }
+.storefront-loading__retry:focus-visible { outline: 2px solid #be123c; outline-offset: 4px; }
+.storefront-loading__sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@keyframes storefront-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .storefront-loading__pulse, .storefront-loading__dots { animation: none; } }
+@media (max-width: 380px) { .storefront-loading__caption { font-size: 9px; letter-spacing: 2.5px; } }
+
 :root {
   /* Brand Colors */
   --brand-red: #E4002B;
