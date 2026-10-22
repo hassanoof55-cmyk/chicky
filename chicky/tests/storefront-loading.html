@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ar">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storefront loading preview</title>
+<div id="root"></div>
+<nav style="position:fixed;top:12px;left:12px;z-index:10;display:flex;gap:8px">
+  <button id="loading">Preview loading</button>
+  <button id="error">Preview error</button>
+</nav>
+<script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import StorefrontLoading from '../components/StorefrontLoading.tsx';
+import '../index.css';
+const root = createRoot(document.getElementById('root'));
+const show = failed => root.render(React.createElement(StorefrontLoading, { failed }));
+document.getElementById('loading').onclick = () => show(false);
+document.getElementById('error').onclick = () => show(true);
+show(false);
+</script>
+</html>
