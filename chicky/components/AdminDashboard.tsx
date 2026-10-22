@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Product, SiteConfig, Area, HeroBanner, TagConfig, CategoryConfig, OrderDetails, StoredOrder, ProductSize } from '../types';
 import { supabase } from '../lib/supabase';
+import { optimizeImage, IMAGE_CACHE_SECONDS, type ImagePurpose } from '../lib/imageUpload';
 
 declare var L: any;
 
@@ -66,6 +67,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
   const [localFilterLabelAr, setLocalFilterLabelAr] = useState(config.filterLabelAr || '');
 
   useEffect(() => {
+    // This component also exists on the storefront; only admins need these requests.
+    if (!isOpen) return;
+
     // 1. Fetch Initial Orders from Supabase
     const fetchOrders = async () => {
       const { data, error } = await supabase
@@ -128,7 +132,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [isOpen]);
 
   const stats = React.useMemo(() => {
     const filteredOrders = orders.filter(o => {
@@ -262,12 +266,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
     });
   };
 
-  const uploadToSupabase = async (file: File, path: string): Promise<string | null> => {
+  const uploadToSupabase = async (file: File, path: ImagePurpose): Promise<string | null> => {
     try {
-      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const optimized = await optimizeImage(file, path);
+      const fileName = `${crypto.randomUUID()}_${optimized.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
       const { data, error } = await supabase.storage
         .from('menu-images')
-        .upload(`${path}/${fileName}`, file, { cacheControl: '3600', upsert: false });
+        .upload(`${path}/${fileName}`, optimized, {
+          cacheControl: IMAGE_CACHE_SECONDS,
+          contentType: optimized.type,
+          upsert: false,
+        });
 
       if (error) throw error;
 
@@ -278,7 +287,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
       return publicUrl;
     } catch (err) {
       console.error('Upload failed:', err);
-      alert('Failed to upload image. Please check if the "menu-images" bucket exists in Supabase Storage.');
+      alert(err instanceof Error ? err.message : 'تعذّر رفع الصورة. راجع اتصالك وحالة Supabase Storage.');
       return null;
     }
   };
