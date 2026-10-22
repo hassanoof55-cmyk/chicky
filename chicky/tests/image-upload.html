@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<meta charset="UTF-8">
+<title>Image upload checks</title>
+<h1>Image upload checks</h1>
+<button id="run">Run image checks</button>
+<pre id="results">Not run</pre>
+<script type="module">
+import { optimizeImage, IMAGE_LIMITS } from '../lib/imageUpload.ts';
+const results = document.querySelector('#results');
+document.querySelector('#run').onclick = async () => {
+  results.textContent = 'Running…';
+  const checks = [];
+  const check = (condition, label) => { if (!condition) throw new Error(label); checks.push('PASS: ' + label); };
+  const encode = canvas => new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2400;
+    canvas.height = 1600;
+    const context = canvas.getContext('2d');
+    const pixels = context.createImageData(canvas.width, canvas.height);
+    // A deliberately large photographic-like input; leave a transparent corner.
+    let random = 42;
+    for (let i = 0; i < pixels.data.length; i += 4) {
+      random = (Math.imul(random, 1664525) + 1013904223) >>> 0;
+      pixels.data[i] = random & 255;
+      pixels.data[i + 1] = (random >>> 8) & 255;
+      pixels.data[i + 2] = (random >>> 16) & 255;
+      pixels.data[i + 3] = i < 4 * 2400 * 100 ? 0 : 255;
+    }
+    context.putImageData(pixels, 0, 0);
+    const input = new File([await encode(canvas)], 'large.png', { type: 'image/png' });
+    for (const purpose of ['product', 'banner', 'logoRed']) {
+      const output = await optimizeImage(input, purpose);
+      check(output.size <= IMAGE_LIMITS[purpose].maxBytes, purpose + ': bounded bytes');
+      check(output.size < input.size, purpose + ': smaller than original');
+      check(output.type === 'image/webp', purpose + ': WebP encoding');
+      const bitmap = await createImageBitmap(output);
+      check(Math.max(bitmap.width, bitmap.height) <= IMAGE_LIMITS[purpose].maxDimension, purpose + ': bounded dimensions');
+      const sample = document.createElement('canvas');
+      sample.width = bitmap.width;
+      sample.height = bitmap.height;
+      const sampleContext = sample.getContext('2d');
+      sampleContext.drawImage(bitmap, 0, 0);
+      check(sampleContext.getImageData(0, 0, 1, 1).data[3] === 0, purpose + ': transparency preserved');
+      checks.push(`  ${input.size} → ${output.size} bytes; ${bitmap.width}×${bitmap.height}`);
+      bitmap.close();
+    }
+    const smallCanvas = document.createElement('canvas');
+    smallCanvas.width = 16; smallCanvas.height = 16;
+    const small = new File([await encode(smallCanvas)], 'small.png', { type: 'image/png' });
+    check(await optimizeImage(small, 'product') === small, 'small files unchanged');
+    let rejected = false;
+    try { await optimizeImage(new File(['broken'], 'broken.png', { type: 'image/png' }), 'product'); }
+    catch { rejected = true; }
+    check(rejected, 'corrupt images rejected');
+    results.textContent = checks.join('\n') + '\nALL CHECKS PASSED';
+  } catch (error) {
+    results.textContent = checks.join('\n') + '\nFAIL: ' + error.message;
+  }
+};
+</script>
+</html>
