@@ -3,6 +3,7 @@ import { X, CheckCircle, Truck, MapPin, Phone, User, Loader2, AlertCircle, Layou
 import { OrderDetails, LocationData, Area, CartItem, Language, ServiceType, PromoCode, SiteConfig } from '../types';
 import { getStoredConfig } from '../data/menuData';
 import { supabase } from '../lib/supabase';
+import { persistOrder } from '../lib/orderSubmission';
 
 declare var L: any;
 
@@ -37,6 +38,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const [step, setStep] = useState(1); // Step 1: Service Choice, Step 2: Details/Location, Step 3: Summary
   const [orderId, setOrderId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
+  const submissionPending = useRef(false);
   const [locationMethod, setLocationMethod] = useState<'map' | 'list'>('map');
   const [details, setDetails] = useState<OrderDetails>({
     name: '',
@@ -281,7 +285,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (!hasCategoryRestrictions && !hasProductRestrictions) {
       return appliedPromo.discountType === 'percentage'
         ? (subtotal * appliedPromo.discountValue / 100)
-        : appliedPromo.discountValue;
+        : Math.min(appliedPromo.discountValue, subtotal);
     }
 
     // Calculate subtotal for eligible items only
@@ -353,6 +357,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }
 
   const handleFinalConfirm = async () => {
+    if (submissionPending.current) return;
     if (step < 3) {
       setStep(3);
       return;
@@ -363,19 +368,25 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    const newOrderId = 'CH-' + Math.random().toString(36).substr(2, 6).toUpperCase();
-    setOrderId(newOrderId);
+    submissionPending.current = true;
+    setSubmitting(true);
+    setSubmissionError('');
+    let newOrderId = '';
 
     // 1. Save to Supabase
     try {
-      await supabase.from('orders').insert([{
-        id: newOrderId,
+      newOrderId = await persistOrder(supabase, {
         customer_name: details.name,
         phone: details.phone2 ? `${details.phone} / ${details.phone2}` : details.phone,
         address: `${details.address} [Payment: ${paymentMethod?.toUpperCase()}]`,
+        service_type: details.serviceType,
+        area_id: selectedArea?.id || null,
+        payment_method: paymentMethod,
         area: selectedArea ? (isAr ? selectedArea.nameAr : selectedArea.nameEn) : 'Pickup/Dine-In',
         location: details.serviceType === 'delivery' ? location : {},
         items: cartItems?.map(item => ({
+          id: item.id,
+          category: item.category,
           name: isAr ? item.nameAr : item.name,
           quantity: item.quantity,
           price: item.price,
@@ -384,32 +395,16 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         })) || [],
         total_price: finalTotal,
         status: 'pending'
-      }]);
-    } catch (e) { console.error('Supabase Save Error:', e); }
-
-    // Update promo code usage limit
-    if (appliedPromo) {
-      try {
-        const { data: promoData, error: fetchError } = await supabase
-          .from('promo_codes')
-          .select('usage_limit')
-          .eq('code', appliedPromo.code)
-          .single();
-
-        if (!fetchError && promoData && promoData.usage_limit !== null && promoData.usage_limit !== undefined) {
-          const nextLimit = Math.max(0, promoData.usage_limit - 1);
-          await supabase
-            .from('promo_codes')
-            .update({
-              usage_limit: nextLimit,
-              is_active: nextLimit > 0
-            })
-            .eq('code', appliedPromo.code);
-        }
-      } catch (e) {
-        console.error('Error updating promo code usage:', e);
-      }
+      }, appliedPromo?.code || null);
+      setOrderId(newOrderId);
+    } catch (e) {
+      setSubmissionError(isAr ? 'تعذر حفظ الطلب. جرّب تاني قبل ما تقفل الصفحة.' : 'Your order could not be saved. Please try again.');
+      submissionPending.current = false;
+      setSubmitting(false);
+      return;
     }
+
+    // Promo usage is updated atomically with the order on the server.
 
     onConfirm({
       ...details,
@@ -424,6 +419,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     // 3. Move to Success Screen
     setStep(4);
+    setSubmitting(false);
+    submissionPending.current = false;
   };
 
   const formatWhatsAppNumber = (num: string) => {
@@ -858,12 +855,14 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
             </div>
 
+            {submissionError && <p role="alert" className="text-red-600 font-bold text-center">{submissionError}</p>}
             <button
               onClick={handleFinalConfirm}
+              disabled={submitting}
               className="w-full bg-red-600 text-white font-black py-8 rounded-[2.5rem] shadow-2xl hover:scale-105 active:scale-95 transition-all text-xl tracking-widest uppercase flex items-center justify-center gap-4 group"
             >
               <Sparkles size={24} className="group-hover:animate-spin" />
-              {t.placeOrder}
+              {submitting ? (isAr ? 'جاري حفظ الطلب…' : 'Saving order…') : t.placeOrder}
             </button>
           </div>
         );

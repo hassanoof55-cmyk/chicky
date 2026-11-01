@@ -24,13 +24,14 @@ const TikTokIcon = ({ size = 18, className = "" }: { size?: number; className?: 
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
+  onSignOut: () => void;
   menu: Product[];
   onUpdateMenu: (newMenu: Product[]) => void;
   config: SiteConfig;
   onUpdateConfig: (newConfig: SiteConfig) => void;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, onUpdateMenu, config, onUpdateConfig }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSignOut, menu, onUpdateMenu, config, onUpdateConfig }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'builder' | 'areas' | 'orders' | 'marketing'>('menu');
   const [builderSubTab, setBuilderSubTab] = useState<'branding' | 'hero' | 'categories' | 'tags' | 'social'>('branding');
   const [orders, setOrders] = useState<StoredOrder[]>([]);
@@ -487,6 +488,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, menu, 
           </div>
 
           <div className="flex items-center gap-4">
+            <button onClick={onSignOut} className="px-4 py-3 text-red-600 font-bold rounded-xl hover:bg-red-50">تسجيل الخروج</button>
             <button onClick={onClose} className="flex items-center gap-3 px-6 py-4 bg-red-50 text-red-600 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm group">
               <RotateCcw size={16} className="group-hover:-rotate-90 transition-transform" /> Back to App
             </button>
