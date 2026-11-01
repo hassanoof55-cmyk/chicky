@@ -15,6 +15,7 @@ import StorefrontLoading from './components/StorefrontLoading';
 import { EMPTY_CONFIG, loadStorefront } from './lib/storefrontData';
 import { Product, CartItem, Language, OrderDetails, SiteConfig, ServiceType, PromoCode } from './types';
 import { supabase } from './lib/supabase';
+import { getVerifiedAdmin } from './lib/adminAuth';
 // Added Search to the lucide-react imports
 import { ArrowRight, Sparkles, Zap, Tag, Tag as TagIcon, X, Search, Flame } from 'lucide-react';
 
@@ -40,6 +41,16 @@ const App: React.FC = () => {
   const [showStickyMenu, setShowStickyMenu] = useState(false);
 
   const isAr = lang === 'ar';
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setIsAdminAuthenticated(false);
+        setIsAdminOpen(false);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
 
 
@@ -258,8 +269,10 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleOpenAdmin = () => {
-    if (isAdminAuthenticated) {
+  const handleOpenAdmin = async () => {
+    const user = await getVerifiedAdmin(supabase).catch(() => null);
+    setIsAdminAuthenticated(!!user);
+    if (user) {
       setIsAdminOpen(true);
     } else {
       setIsAdminAuthOpen(true);
@@ -401,7 +414,7 @@ const App: React.FC = () => {
       />
 
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} items={cart} onUpdateQuantity={updateQuantity} onRemove={removeFromCart} onCheckout={() => { setIsCartOpen(false); setIsCheckoutOpen(true); }} lang={lang} />
-      <CheckoutModal 
+      {isCheckoutOpen && <CheckoutModal
         isOpen={isCheckoutOpen} 
         onClose={() => setIsCheckoutOpen(false)} 
         subtotal={cartSubtotal} 
@@ -411,10 +424,10 @@ const App: React.FC = () => {
         lang={lang} 
         serviceType={serviceType || 'delivery'}
         config={config}
-      />
+      />}
 
       <AdminAuthModal isOpen={isAdminAuthOpen} onClose={() => setIsAdminAuthOpen(false)} onAuthenticated={handleAdminAuthenticated} />
-      <AdminDashboard isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} menu={menu} onUpdateMenu={updateMenu} config={config} onUpdateConfig={updateConfig} />
+      {isAdminOpen && isAdminAuthenticated && <AdminDashboard isOpen={true} onClose={() => setIsAdminOpen(false)} onSignOut={async () => { await supabase.auth.signOut(); setIsAdminAuthenticated(false); setIsAdminOpen(false); }} menu={menu} onUpdateMenu={updateMenu} config={config} onUpdateConfig={updateConfig} />}
     </div>
   );
 };
