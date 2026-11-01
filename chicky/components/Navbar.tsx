@@ -57,7 +57,7 @@ const Navbar: React.FC<NavbarProps> = ({
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-red-500 transition-colors" size={18} />
             <input
               type="text"
-              placeholder={lang === 'en' ? "What are you craving?" : "بماذا تشعر بالجوع؟"}
+              placeholder={lang === 'en' ? "What are you craving?" : "نفسك تاكل إيه؟"}
               onChange={(e) => onSearchChange(e.target.value)}
               className="w-full bg-slate-100/50 border-2 border-transparent rounded-2xl py-2.5 pl-11 pr-4 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/10 outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
             />
