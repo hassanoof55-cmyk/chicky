@@ -70,6 +70,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
   useEffect(() => {
     // This component also exists on the storefront; only admins need these requests.
     if (!isOpen) return;
+    const orderAlert = new Audio('/audio/order-alert.mp3');
+    orderAlert.volume = 1;
+    orderAlert.preload = 'auto';
 
     // 1. Fetch Initial Orders from Supabase
     const fetchOrders = async () => {
@@ -124,15 +127,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
         setOrders(prev => [mapped, ...prev]);
 
         // Sound Notification
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-        audio.play().catch(() => { });
+        orderAlert.currentTime = 0;
+        orderAlert.play().catch(() => { });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'promo_codes' }, () => {
         fetchPromoCodes();
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      orderAlert.pause();
+      orderAlert.currentTime = 0;
+      supabase.removeChannel(channel);
+    };
   }, [isOpen]);
 
   const stats = React.useMemo(() => {
