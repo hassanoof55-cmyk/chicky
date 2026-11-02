@@ -2,7 +2,7 @@
 -- Dedicated disposable database only; fixtures and assertions always roll back.
 BEGIN;
 
-INSERT INTO public.menu_items(id,name,nameAr,price,category,sizes)
+INSERT INTO public.menu_items(id,name,"nameAr",price,category,sizes)
 VALUES ('analytics-test-catalog','Catalog chicken','كتالوج',30,'test',
   '[{"id":"regular","nameEn":"Regular","nameAr":"عادي","price":30},
     {"id":"large","nameEn":"Large","nameAr":"كبير","price":35}]');
@@ -170,7 +170,7 @@ DO $$ DECLARE e jsonb; BEGIN
        OR payload ?| ARRAY['client_id','session_id'])) THEN
     RAISE EXCEPTION 'PII, raw fields, identifiers or fabricated tax leaked'; END IF;
   IF e - ARRAY['name','params'] <> '{}'::jsonb
-    OR e->'params' - ARRAY['transaction_id','currency','value','shipping','items'] <> '{}'::jsonb
+    OR (e->'params') - ARRAY['transaction_id','currency','value','shipping','items'] <> '{}'::jsonb
     OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'params'->'items') i
       WHERE i - ARRAY['item_id','item_name','item_variant','price','quantity'] <> '{}'::jsonb) THEN
     RAISE EXCEPTION 'Event contains fields outside the explicit allowlist'; END IF;

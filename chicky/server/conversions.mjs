@@ -72,9 +72,11 @@ async function request(fetcher, url, options, consume = async response => respon
 }
 
 function rpc(config, name, body, consume) {
-  return request(config.fetcher, `${config.supabaseUrl.replace(/\/$/, '')}/rest/v1/rpc/${name}`, {
-    method: 'POST', headers: { apikey: config.publicKey || config.serviceKey, Authorization: `Bearer ${config.serviceKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+  const publicWorker = !!config.publicKey;
+  const endpoint = publicWorker ? ({claim_chicky_analytics_batch:'claim_chicky_analytics_worker',finish_chicky_analytics_event:'finish_chicky_analytics_worker'}[name]) : name;
+  return request(config.fetcher, `${config.supabaseUrl.replace(/\/$/, '')}/rest/v1/rpc/${endpoint}`, {
+    method: 'POST', headers: { apikey: config.publicKey || config.serviceKey, Authorization: `Bearer ${config.publicKey || config.serviceKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(publicWorker ? {...body,p_worker_token:config.serviceKey} : body),
   }, async response => {
     if (!response.ok) throw new Error('Conversion outbox request failed');
     return consume ? consume(response) : undefined;

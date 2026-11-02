@@ -53,6 +53,20 @@ test('missing configuration does not claim work or create a worker', async () =>
     assert.equal(conversions.startConversionWorker(options), null);
   }
 });
+test('production uses a dedicated RPC key without privileged database credentials in headers or Google payloads',async()=>{
+ const calls=[];const workerToken='a'.repeat(64);
+ const result=await conversions.runConversionBatch({...config,publicKey:'public-anon-key',serviceKey:workerToken,fetcher:async(url,options)=>{
+  const body=JSON.parse(options.body);calls.push({url:String(url),headers:options.headers,body});
+  if(String(url).endsWith('/claim_chicky_analytics_worker'))return Response.json([{order_id:orderId,payload:payload()}]);
+  return new Response(null,{status:204});
+ }});
+ assert.equal(result.sent,1);
+ assert.equal(calls[0].headers.Authorization,'Bearer public-anon-key');
+ assert.equal(calls[0].body.p_worker_token,workerToken);
+ assert.match(calls[2].url,/finish_chicky_analytics_worker$/);
+ assert.equal(calls[2].body.p_worker_token,workerToken);
+ assert.doesNotMatch(JSON.stringify(calls[1]),/aaaaaaaaaaaaaaaa/);
+});
 
 test('reconstructs every level of payload without forwarding additional private fields', async () => {
   const p = payload();
