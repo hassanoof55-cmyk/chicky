@@ -1,5 +1,6 @@
 export async function persistOrder(client: any, order: Record<string, unknown>, promoCode: string | null = null, storage: Storage = sessionStorage) {
-  const bytes = new TextEncoder().encode(JSON.stringify({ order, promoCode }));
+  const { analytics, ...businessOrder } = order;
+  const bytes = new TextEncoder().encode(JSON.stringify({ order: businessOrder, promoCode }));
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   const key = 'chicky_order_attempt_' + Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
   const id = storage.getItem(key) || 'CH-' + crypto.randomUUID().toUpperCase();

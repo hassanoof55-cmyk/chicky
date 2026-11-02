@@ -16,14 +16,21 @@ import { EMPTY_CONFIG, loadStorefront } from './lib/storefrontData';
 import { Product, CartItem, Language, OrderDetails, SiteConfig, ServiceType, PromoCode } from './types';
 import { supabase } from './lib/supabase';
 import { getVerifiedAdmin } from './lib/adminAuth';
+import { storefrontRoute, routeMenu, routeTitle } from './lib/storefrontRoute';
+import { initializeAnalytics, trackCommerce, analyticsItem, ANALYTICS_CONSENT_EVENT, getAnalyticsConsent } from './lib/analytics';
+import { revokeAnalyticsReceipts } from './lib/orderAnalytics';
+import AnalyticsConsent from './components/AnalyticsConsent';
+import { CART_STORAGE_KEY, serializeCart, restoreCart } from './lib/cartPersistence';
 // Added Search to the lucide-react imports
 import { ArrowRight, Sparkles, Zap, Tag, Tag as TagIcon, X, Search, Flame } from 'lucide-react';
 
 const App: React.FC = () => {
+  const route = useMemo(() => storefrontRoute(window.location.pathname, window.location.search), []);
   const [menu, setMenu] = useState<Product[]>([]);
   const [config, setConfig] = useState<SiteConfig>(EMPTY_CONFIG);
   const [dataStatus, setDataStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartRestored, setCartRestored] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -105,7 +112,8 @@ const App: React.FC = () => {
       
       document.documentElement.style.setProperty('--brand-red', primaryColor);
       document.documentElement.dir = isAr ? 'rtl' : 'ltr';
-      document.title = isAr ? 'تشيكي فرايد تشيكن | أقوى فرايد تشيكن' : 'Chicky Fried Chicken | Egypt\'s #1';
+      document.documentElement.lang = lang;
+      document.title = routeTitle(menu, config, route, isAr);
       
       if (logoRed) {
         const link: any = document.querySelector("link[rel*='icon']") || document.createElement('link');
@@ -115,7 +123,27 @@ const App: React.FC = () => {
     } catch (e) {
       console.error('Document update error:', e);
     }
-  }, [config.theme?.primaryColor, isAr, config.header?.logoRed]);
+  }, [config.theme?.primaryColor, isAr, config.header?.logoRed, menu, config.layout]);
+
+  useEffect(() => {
+    if (dataStatus !== 'ready') return;
+    menu.forEach(p => { analyticsItem(p); p.sizes?.forEach(size => analyticsItem(p, 1, size)); });
+    initializeAnalytics(import.meta.env.VITE_GA4_MEASUREMENT_ID || '');
+  }, [dataStatus, menu]);
+  useEffect(() => {
+    const revoke = () => { if (getAnalyticsConsent() === 'rejected') void revokeAnalyticsReceipts(supabase); };
+    revoke(); window.addEventListener(ANALYTICS_CONSENT_EVENT, revoke);
+    return () => window.removeEventListener(ANALYTICS_CONSENT_EVENT, revoke);
+  }, []);
+  useEffect(() => {
+    if (dataStatus !== 'ready' || cartRestored) return;
+    try { setCart(restoreCart(sessionStorage.getItem(CART_STORAGE_KEY), menu)); } catch {}
+    setCartRestored(true);
+  }, [dataStatus, menu, cartRestored]);
+  useEffect(() => {
+    if (!cartRestored || dataStatus !== 'ready') return;
+    try { sessionStorage.setItem(CART_STORAGE_KEY, serializeCart(cart)); } catch {}
+  }, [cart, cartRestored, dataStatus]);
 
   // Handle Sticky Menu on Scroll
   useEffect(() => {
@@ -142,12 +170,12 @@ const App: React.FC = () => {
   };
 
   const filteredMenu = useMemo(() => {
-    let result = menu;
+    let result = routeMenu(menu, route);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(item => 
-        item.name.toLowerCase().includes(q) || 
-        item.nameAr.includes(q) ||
+        (item.name || '').toLowerCase().includes(q) ||
+        (item.nameAr || '').includes(q) ||
         item.tags?.some(tag => tag.toLowerCase().includes(q))
       );
     }
@@ -188,9 +216,11 @@ const App: React.FC = () => {
   }, [cart, isAr]);
 
   const addToCart = (product: Product, spiciness?: 'Normal' | 'Spicy', size?: any, modifiers?: any[]) => {
+    if (product.hasSizes && !size) { window.location.href = `/products/${encodeURIComponent(product.id)}`; return; }
     const modifierTotal = (modifiers || []).reduce((acc, m) => acc + m.price, 0);
     const basePrice = size ? size.price : product.price;
     const finalPrice = basePrice + modifierTotal;
+    trackCommerce('add_to_cart', [analyticsItem(product, 1, size, finalPrice)]);
 
     const cartBtn = document.getElementById('cart-btn');
     if (cartBtn) {
@@ -229,6 +259,8 @@ const App: React.FC = () => {
   };
 
   const updateQuantity = (id: string, delta: number, spiciness?: 'Normal' | 'Spicy', price?: number, sizeId?: string, modifiersJson?: string) => {
+    const target = cart.find(item => item.id === id && item.selectedSpiciness === spiciness && (price === undefined || item.price === price) && (sizeId === undefined || item.selectedSize?.id === sizeId) && (modifiersJson === undefined || JSON.stringify(item.selectedModifiers || []) === modifiersJson));
+    if (target && (delta > 0 || target.quantity > 1)) trackCommerce(delta > 0 ? 'add_to_cart' : 'remove_from_cart', [analyticsItem(target, 1, target.selectedSize, target.price)]);
     setCart(prev => prev?.map(item => {
       if (item.id === id && 
           item.selectedSpiciness === spiciness && 
@@ -243,11 +275,13 @@ const App: React.FC = () => {
   };
 
   const removeFromCart = (id: string, spiciness?: 'Normal' | 'Spicy', price?: number) => {
+    const removed = cart.filter(item => item.id === id && item.selectedSpiciness === spiciness && (price === undefined || item.price === price));
+    if (removed.length) trackCommerce('remove_from_cart', removed.map(item => analyticsItem(item, item.quantity, item.selectedSize, item.price)));
     setCart(prev => prev.filter(item => !(item.id === id && item.selectedSpiciness === spiciness && (price === undefined || item.price === price))));
   };
 
   const handleConfirmOrder = (details: OrderDetails) => {
-    console.log('Order processed visually.', details, cart);
+    // Pending submissions are not completed sales; do not emit purchase here.
   };
 
   const cartSubtotal = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
@@ -310,7 +344,7 @@ const App: React.FC = () => {
         hasItemsInCategory={(catId) => filteredMenu.some(p => p.category === catId)}
       />
       
-      {!activeTag && !searchQuery && (
+      {!route.productId && !route.categoryId && !activeTag && !searchQuery && (
         <HeroCarousel banners={config.hero.banners} isAr={isAr} onCategoryClick={scrollToCategory} />
       )}
 
@@ -331,6 +365,8 @@ const App: React.FC = () => {
       )}
 
       <main className="max-w-7xl mx-auto px-6 md:px-12 py-16 mb-24 md:mb-0">
+        {(route.productId || route.categoryId) && <header className="mb-8"><a className="text-red-700 font-bold underline underline-offset-4" href="/">{isAr ? 'الرجوع للمنيو' : 'Back to menu'}</a><h1 className="text-3xl font-black mt-5">{routeTitle(menu, config, route, isAr).replace(' | CHICKY', '')}</h1></header>}
+        <p className="text-sm text-slate-600 mb-6">{isAr ? 'الأسعار شاملة الضريبة. مصاريف التوصيل بتظهر حسب منطقتك عند إتمام الطلب.' : 'Prices include tax. Delivery fees are shown for your area at checkout.'}</p>
         
         {/* ACTIVE FILTER HEADER */}
         {(activeTag || searchQuery) && (
@@ -355,7 +391,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {!activeTag && !searchQuery && (
+        {!route.productId && !route.categoryId && !activeTag && !searchQuery && (
           <RecommendedSection title={recommendationTitle} items={recommendations} onAddToCart={addToCart} lang={lang} />
         )}
         
@@ -386,7 +422,7 @@ const App: React.FC = () => {
         {config?.layout?.map((cat) => {
           const catItems = filteredMenu.filter(p => p.category === cat.id);
           if (catItems.length === 0) return null;
-          return <MenuSection key={cat.id} category={cat} items={catItems} onAddToCart={addToCart} lang={lang} tagsConfig={config.tags} />;
+          return <MenuSection key={cat.id} category={cat} items={catItems} onAddToCart={addToCart} lang={lang} tagsConfig={config.tags} initialSizeId={route.sizeId} productPage={!!route.productId} />;
         })}
         
         {filteredMenu.length === 0 && (
@@ -401,6 +437,8 @@ const App: React.FC = () => {
       </main>
 
       <Footer config={config} lang={lang} onOpenAdmin={handleOpenAdmin} scrollToCategory={scrollToCategory} />
+      <nav className="flex flex-wrap justify-center gap-6 px-6 py-5 pb-24 md:pb-5 text-sm text-slate-700"><a className="underline underline-offset-4" href="/policies">{isAr ? 'التوصيل ومشكلة في الطلب' : 'Delivery & order issues'}</a><a className="underline underline-offset-4" href="/privacy">{isAr ? 'الخصوصية' : 'Privacy'}</a></nav>
+      <AnalyticsConsent lang={lang} />
       {config.header.phone && <WhatsAppFloat phone={config.header.phone} lang={lang} />}
       <MobileBottomNav 
         onOpenCart={() => setIsCartOpen(true)} 
@@ -413,7 +451,7 @@ const App: React.FC = () => {
         onCategoryClick={scrollToCategory}
       />
 
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} items={cart} onUpdateQuantity={updateQuantity} onRemove={removeFromCart} onCheckout={() => { setIsCartOpen(false); setIsCheckoutOpen(true); }} lang={lang} />
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} items={cart} onUpdateQuantity={updateQuantity} onRemove={removeFromCart} onCheckout={() => { trackCommerce('begin_checkout', cart.map(item => analyticsItem(item, item.quantity, item.selectedSize, item.price))); setIsCartOpen(false); setIsCheckoutOpen(true); }} lang={lang} />
       {isCheckoutOpen && <CheckoutModal
         isOpen={isCheckoutOpen} 
         onClose={() => setIsCheckoutOpen(false)} 

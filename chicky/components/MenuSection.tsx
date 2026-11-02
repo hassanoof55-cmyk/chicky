@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { trackCommerce, analyticsItem } from '../lib/analytics';
 import { Plus, Flame, CheckCircle, X, Sparkles } from 'lucide-react';
 import { Product, Language, CategoryConfig, TagConfig } from '../types';
 
@@ -9,9 +10,28 @@ interface MenuSectionProps {
   onAddToCart: (product: Product, spiciness?: 'Normal' | 'Spicy', size?: any, modifiers?: any[]) => void;
   lang: Language;
   tagsConfig: TagConfig[];
+  initialSizeId?: string | null;
+  productPage?: boolean;
 }
 
-const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart, lang, tagsConfig }) => {
+const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart, lang, tagsConfig, initialSizeId, productPage }) => {
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const element = sectionRef.current;
+    if (!element) return;
+    let observed = false;
+    const observer = new IntersectionObserver(entries => {
+      if (!observed && entries.some(entry => entry.isIntersecting)) {
+        observed = true;
+        if (productPage && items[0]) {
+          const size = items[0].sizes?.find(s => s.id === initialSizeId) || (items[0].hasSizes ? items[0].sizes?.[0] : undefined);
+          trackCommerce('view_item', [analyticsItem(items[0], 1, size)]);
+        } else trackCommerce('view_item_list', items.map(item => analyticsItem(item, 1, item.hasSizes ? item.sizes?.[0] : undefined)), { item_list_id: category.id, item_list_name: category.nameEn });
+      }
+    }, { threshold: 0.1 });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [items, productPage, initialSizeId, category.id]);
   const [animatingId, setAnimatingId] = useState<string | null>(null);
   const [showOptionsId, setShowOptionsId] = useState<string | null>(null);
   const [tempSelection, setTempSelection] = useState<{ size?: any, spiciness?: any, modifiers?: any[] }>({});
@@ -20,8 +40,9 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
   const currentItem = items.find(i => i.id === showOptionsId);
 
   const handleAddClick = (product: Product) => {
+    trackCommerce('select_item', [analyticsItem(product, 1, product.sizes?.find(s => s.id === initialSizeId) || (product.hasSizes ? product.sizes?.[0] : undefined))], { item_list_id: category.id });
     if (product.hasSizes || product.spicinessOption || (product.modifiers && product.modifiers.length > 0)) {
-      setTempSelection({ modifiers: [] });
+      setTempSelection({ modifiers: [], size: product.sizes?.find(s => s.id === initialSizeId) || (product.hasSizes ? product.sizes?.find(s => Number.isFinite(s.price) && s.price > 0) : undefined) });
       setShowOptionsId(product.id);
     } else {
       executeAdd(product);
@@ -37,7 +58,7 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
   };
 
   return (
-    <section id={category.id} className="py-12 scroll-mt-32">
+    <section ref={sectionRef} id={category.id} className="py-12 scroll-mt-32">
       <div className="flex items-center gap-6 mb-10">
         <h2 className="text-4xl font-black brand-font tracking-tight uppercase text-slate-900">
           {lang === 'en' ? category.nameEn : category.nameAr}
@@ -153,6 +174,7 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-8">
         {items?.map((item) => {
           const isAnimating = animatingId?.startsWith(item.id);
+          const displayPrice = item.hasSizes ? (item.sizes?.find(s => s.id === initialSizeId) || item.sizes?.find(s => Number.isFinite(s.price) && s.price > 0))?.price ?? item.price : item.price;
 
           return (
             <div 
@@ -190,7 +212,7 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
                   )}
                   <div className="flex items-baseline gap-1">
                     <span className="text-lg md:text-2xl font-black leading-none text-white tracking-tighter">
-                      {item.price}
+                      {displayPrice}
                     </span>
                     <span className="text-[7px] md:text-[9px] font-black text-white/40 uppercase">{isAr ? 'ج.م' : 'LE'}</span>
                   </div>
@@ -201,7 +223,7 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
                 <div className="space-y-2 md:space-y-3">
                   <div className="flex justify-between items-start gap-2 md:gap-4">
                     <h3 className="font-black text-sm md:text-xl text-slate-900 leading-tight group-hover:text-red-600 transition-colors uppercase brand-font tracking-tight text-balance">
-                      {lang === 'en' ? item.name : item.nameAr}
+                      <a href={`/products/${encodeURIComponent(item.id)}`} onClick={() => trackCommerce('select_item', [analyticsItem(item, 1, item.hasSizes ? item.sizes?.[0] : undefined)], { item_list_id: category.id })}>{lang === 'en' ? item.name : item.nameAr}</a>
                     </h3>
                     {item.isSpicy && (
                       <div className="bg-red-50 text-red-600 p-1.5 md:p-2 rounded-lg md:rounded-xl shrink-0">
@@ -213,6 +235,7 @@ const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart,
                   <p className="text-[10px] md:text-xs text-slate-500 font-medium leading-relaxed line-clamp-2 opacity-80">
                     {lang === 'en' ? item.description : item.descriptionAr}
                   </p>
+                  {productPage && item.hasSizes && <nav className="flex flex-wrap gap-3 pt-3" aria-label={isAr ? 'الأحجام' : 'Sizes'}>{item.sizes?.map(size => <a key={size.id} className={`text-sm font-bold underline underline-offset-4 ${initialSizeId === size.id ? 'text-red-700' : 'text-slate-700'}`} href={`/products/${encodeURIComponent(item.id)}?size=${encodeURIComponent(size.id)}`}>{isAr ? size.nameAr : size.nameEn} — {size.price} {isAr ? 'ج.م' : 'EGP'}</a>)}</nav>}
                 </div>
 
                 <div className="mt-4 md:mt-8 flex gap-1 md:gap-2">

@@ -4,6 +4,8 @@ import { OrderDetails, LocationData, Area, CartItem, Language, ServiceType, Prom
 import { getStoredConfig } from '../data/menuData';
 import { supabase } from '../lib/supabase';
 import { persistOrder } from '../lib/orderSubmission';
+import { trackCommerce, analyticsItem, getAnalyticsContext, getAnalyticsConsent } from '../lib/analytics';
+import { rememberAnalyticsReceipt, revokeAnalyticsReceipts } from '../lib/orderAnalytics';
 
 declare var L: any;
 
@@ -305,6 +307,14 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }, [appliedPromo, subtotal, cartItems]);
 
   const finalTotal = subtotal + currentFee - discountAmount;
+  const shippingTracked = useRef('');
+  useEffect(() => {
+    if (step !== 3) return;
+    const selection = `${details.serviceType}:${selectedArea?.id || ''}:${currentFee}`;
+    if (shippingTracked.current === selection) return;
+    shippingTracked.current = selection;
+    trackCommerce('add_shipping_info', cartItems.map(item => analyticsItem(item, item.quantity, item.selectedSize, item.price)), { shipping_tier: details.serviceType, shipping: currentFee });
+  }, [step, details.serviceType, selectedArea?.id, currentFee]);
 
   const handleApplyPromo = async () => {
     setPromoError(null);
@@ -375,7 +385,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     // 1. Save to Supabase
     try {
+      const context = await getAnalyticsContext();
+      const analytics = context && getAnalyticsConsent() === 'accepted' ? { ...context, consent: true, revoke_token: crypto.randomUUID() } : undefined;
+      if (analytics) rememberAnalyticsReceipt(analytics.revoke_token);
       newOrderId = await persistOrder(supabase, {
+        ...(analytics ? { analytics } : {}),
         customer_name: details.name,
         phone: details.phone2 ? `${details.phone} / ${details.phone2}` : details.phone,
         address: `${details.address} [Payment: ${paymentMethod?.toUpperCase()}]`,
@@ -392,11 +406,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           price: item.price,
           spiciness: item.selectedSpiciness,
           size: item.selectedSize ? (isAr ? item.selectedSize.nameAr : item.selectedSize.nameEn) : null
+          ,size_id: item.selectedSize?.id || null
         })) || [],
         total_price: finalTotal,
         status: 'pending'
       }, appliedPromo?.code || null);
       setOrderId(newOrderId);
+      if (getAnalyticsConsent() !== 'accepted') void revokeAnalyticsReceipts(supabase);
     } catch (e) {
       setSubmissionError(isAr ? 'تعذر حفظ الطلب. جرّب تاني قبل ما تقفل الصفحة.' : 'Your order could not be saved. Please try again.');
       submissionPending.current = false;
@@ -752,7 +768,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <button
                       key={m.id}
                       type="button"
-                      onClick={() => setPaymentMethod(m.id as any)}
+                      onClick={() => { setPaymentMethod(m.id as any); trackCommerce('add_payment_info', cartItems.map(item => analyticsItem(item, item.quantity, item.selectedSize, item.price)), { payment_type: m.id }); }}
                       className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${paymentMethod === m.id ? 'bg-slate-950 border-slate-950 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400 hover:border-red-600'}`}
                     >
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${paymentMethod === m.id ? 'bg-white/10' : 'bg-slate-50'}`}>

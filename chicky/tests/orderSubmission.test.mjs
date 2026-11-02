@@ -27,3 +27,10 @@ test('an uncertain response reuses its order ID across retries and remounts',asy
  await persistOrder(client,order,null,savedStorage);
  assert.notEqual(ids[1],ids[2]);
 });
+test('optional analytics metadata cannot create a second business order after an uncertain response',async()=>{
+ const savedStorage=storage(),ids=[];
+ const client={async rpc(name,args){ids.push(args.p_order.id);return {error:ids.length===1?{message:'response lost'}:null};}};
+ await assert.rejects(persistOrder(client,{...order,analytics:{client_id:'1.2',session_id:'123'}},null,savedStorage));
+ await persistOrder(client,{...order,analytics:{client_id:'3.4',session_id:'456'}},null,savedStorage);
+ assert.equal(ids[0],ids[1]);
+});
