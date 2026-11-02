@@ -202,6 +202,7 @@ BEGIN
     JOIN public.orders o ON o.id=q.order_id
     WHERE q.sent_at IS NULL AND q.next_attempt_at<=now()
       AND (q.locked_until IS NULL OR q.locked_until<=now())
+      AND o.status='completed'
       AND c.consented AND c.created_at BETWEEN now()-interval '72 hours' AND now()
       AND o.created_at BETWEEN now()-interval '72 hours' AND now()
     ORDER BY q.next_attempt_at,q.created_at,q.order_id

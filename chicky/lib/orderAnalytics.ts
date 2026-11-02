@@ -7,8 +7,9 @@ export function rememberAnalyticsReceipt(token:string,storage:Storage=localStora
  try{const rows=read(storage);if(!rows.some(r=>r.token===token))rows.push({token,created:Date.now()});storage.setItem(KEY,JSON.stringify(rows.slice(-100)));}catch{}
 }
 export async function revokeAnalyticsReceipts(client:any,storage:Storage=localStorage){
- const receipts=read(storage);const succeeded=new Set<string>();
- await Promise.all(receipts.map(async r=>{try{const {error}=await client.rpc('revoke_chicky_analytics',{p_token:r.token});if(!error)succeeded.add(r.token);}catch{}}));
- // Re-read so concurrent order submissions do not lose their revocation receipts.
- try{storage.setItem(KEY,JSON.stringify(read(storage).filter(r=>!succeeded.has(r.token))));}catch{}
+ const receipts=read(storage);
+ await Promise.all(receipts.map(async r=>{try{await client.rpc('revoke_chicky_analytics',{p_token:r.token});}catch{}}));
+ // An unknown token succeeds too: its order may still be in flight in another
+ // tab. Retain bounded receipts until 72h expiry and repeat on settlement.
+ try{storage.setItem(KEY,JSON.stringify(read(storage)));}catch{}
 }

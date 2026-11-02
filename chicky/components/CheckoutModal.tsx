@@ -405,14 +405,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           quantity: item.quantity,
           price: item.price,
           spiciness: item.selectedSpiciness,
-          size: item.selectedSize ? (isAr ? item.selectedSize.nameAr : item.selectedSize.nameEn) : null
-          ,size_id: item.selectedSize?.id || null
+          size: item.selectedSize ? (isAr ? item.selectedSize.nameAr : item.selectedSize.nameEn) : null,
+          size_id: item.selectedSize?.id || null
         })) || [],
         total_price: finalTotal,
         status: 'pending'
       }, appliedPromo?.code || null);
       setOrderId(newOrderId);
-      if (getAnalyticsConsent() !== 'accepted') void revokeAnalyticsReceipts(supabase);
+      if (getAnalyticsConsent() !== 'accepted') {
+        if (analytics) void supabase.rpc('revoke_chicky_analytics', { p_token: analytics.revoke_token }).then(() => {}, () => {});
+        void revokeAnalyticsReceipts(supabase);
+      }
     } catch (e) {
       setSubmissionError(isAr ? 'تعذر حفظ الطلب. جرّب تاني قبل ما تقفل الصفحة.' : 'Your order could not be saved. Please try again.');
       submissionPending.current = false;

@@ -190,6 +190,22 @@ DO $$ BEGIN
 END $$;
 
 -- Isolate queue fixtures without disturbing existing events after rollback.
+-- A queued completed sale cancelled before delivery must not be claimed.
+UPDATE public.orders SET status='cancelled' WHERE id IN
+  (SELECT p->>'id' FROM analytics_fixtures WHERE n=9);
+SET LOCAL ROLE chicky_analytics_worker;
+DO $$ BEGIN
+  IF has_table_privilege(current_user,'public.orders','SELECT,INSERT,UPDATE,DELETE')
+    OR has_table_privilege(current_user,'public.chicky_analytics_context','SELECT') THEN
+    RAISE EXCEPTION 'Worker has broad table access'; END IF;
+  IF EXISTS(SELECT 1 FROM public.claim_chicky_analytics_batch(20)
+    WHERE order_id='CH-ACACACAC-0000-0000-0000-000000000009') THEN
+    RAISE EXCEPTION 'Cancelled sale was claimed'; END IF;
+END $$;
+RESET ROLE;
+UPDATE public.chicky_analytics_outbox SET locked_until=NULL WHERE order_id LIKE 'CH-ACACACAC-%';
+UPDATE public.orders SET status='completed' WHERE id IN
+  (SELECT p->>'id' FROM analytics_fixtures WHERE n=9);
 UPDATE public.chicky_analytics_outbox SET next_attempt_at=now()+interval '1 day'
 WHERE order_id NOT LIKE 'CH-ACACACAC-%';
 SET LOCAL ROLE service_role;
