@@ -49,7 +49,7 @@ export default function AnalyticsConsent({ lang }: { lang: Language }) {
   const choiceClass = 'min-h-11 flex-1 rounded-xl border-2 border-gray-900 bg-white px-4 py-3 font-bold text-gray-900 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700';
 
   return (
-    <aside lang={lang} dir={lang === 'ar' ? 'rtl' : 'ltr'} className="fixed bottom-3 left-3 right-3 z-50 max-w-lg text-gray-900 sm:right-auto">
+    <aside lang={lang} dir={lang === 'ar' ? 'rtl' : 'ltr'} className="fixed bottom-32 md:bottom-3 left-3 right-3 z-[60] max-w-lg text-gray-900 sm:right-auto">
       {open && (
         <section id={`${id}-panel`} role="region" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}
           className="mb-2 rounded-2xl border border-gray-300 bg-white p-4 shadow-xl"
