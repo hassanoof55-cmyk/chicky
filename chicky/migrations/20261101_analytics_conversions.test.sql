@@ -191,6 +191,7 @@ END $$;
 
 -- Isolate queue fixtures without disturbing existing events after rollback.
 -- A queued completed sale cancelled before delivery must not be claimed.
+SAVEPOINT cancelled_conversion;
 UPDATE public.orders SET status='cancelled' WHERE id IN
   (SELECT p->>'id' FROM analytics_fixtures WHERE n=9);
 SET LOCAL ROLE chicky_analytics_worker;
@@ -203,9 +204,8 @@ DO $$ BEGIN
     RAISE EXCEPTION 'Cancelled sale was claimed'; END IF;
 END $$;
 RESET ROLE;
-UPDATE public.chicky_analytics_outbox SET locked_until=NULL WHERE order_id LIKE 'CH-ACACACAC-%';
-UPDATE public.orders SET status='completed' WHERE id IN
-  (SELECT p->>'id' FROM analytics_fixtures WHERE n=9);
+ROLLBACK TO SAVEPOINT cancelled_conversion;
+RELEASE SAVEPOINT cancelled_conversion;
 UPDATE public.chicky_analytics_outbox SET next_attempt_at=now()+interval '1 day'
 WHERE order_id NOT LIKE 'CH-ACACACAC-%';
 SET LOCAL ROLE service_role;
