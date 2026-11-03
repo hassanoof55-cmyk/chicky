@@ -154,8 +154,7 @@ export const INITIAL_SITE_CONFIG: SiteConfig = {
   ],
   areas: [],
   theme: { primaryColor: '#E4002B' },
-  branchStatus: 'open',
-  branches: ['Alexandria - Palm Beach', 'Alexandria - North Coast', 'Cairo - Maadi']
+  branchStatus: 'open'
 };
 
 export const getStoredMenu = (): Product[] => {

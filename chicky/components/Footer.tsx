@@ -15,9 +15,10 @@ interface FooterProps {
   lang: Language;
   onOpenAdmin: () => void;
   scrollToCategory: (id: string) => void;
+  privacyControl?: React.ReactNode;
 }
 
-const Footer: React.FC<FooterProps> = ({ config, lang, onOpenAdmin, scrollToCategory }) => {
+const Footer: React.FC<FooterProps> = ({ config, lang, onOpenAdmin, scrollToCategory, privacyControl }) => {
   const isAr = lang === 'ar';
 
   return (
@@ -111,9 +112,10 @@ const Footer: React.FC<FooterProps> = ({ config, lang, onOpenAdmin, scrollToCate
             {isAr ? config.footer.copyrightAr : config.footer.copyrightEn}
           </a>
         </p>
-        <div className="flex gap-8">
-          <span className="hover:text-white cursor-pointer transition-colors">PRIVACY</span>
-          <span className="hover:text-white cursor-pointer transition-colors">TERMS</span>
+        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
+          <a href="/privacy" className="min-h-11 inline-flex items-center hover:text-white transition-colors">PRIVACY</a>
+          <a href="/policies" className="min-h-11 inline-flex items-center hover:text-white transition-colors">TERMS</a>
+          {privacyControl}
         </div>
       </div>
     </footer>

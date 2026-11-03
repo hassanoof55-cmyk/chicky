@@ -3,71 +3,69 @@ import type { Language } from '../types';
 import { ANALYTICS_CONSENT_EVENT, getAnalyticsConsent, setAnalyticsConsent } from '../lib/analytics';
 import type { AnalyticsConsent as Consent } from '../lib/analytics';
 
-const copy = {
-  en: {
-    title: 'Optional analytics',
-    description: 'With your permission, Google Analytics helps us understand menu browsing and ordering steps. We do not send your name, phone, address or order notes. Rejecting analytics does not affect ordering. You can change your choice anytime.',
-    accept: 'Accept analytics', reject: 'Reject analytics', settings: 'Analytics settings', close: 'Close settings',
-    accepted: 'Analytics is on.', rejected: 'Analytics is off.', unknown: 'Analytics is off until you accept.',
-  },
-  ar: {
-    title: 'تحليلات اختيارية',
-    description: 'بموافقتك، Google Analytics بيساعدنا نفهم تصفح المنيو وخطوات الطلب. مش بنبعت اسمك أو تليفونك أو عنوانك أو ملاحظات الطلب. رفض التحليلات مش بيأثر على طلبك، وتقدر تغيّر اختيارك في أي وقت.',
-    accept: 'قبول التحليلات', reject: 'رفض التحليلات', settings: 'إعدادات التحليلات', close: 'قفل الإعدادات',
-    accepted: 'التحليلات مفعّلة.', rejected: 'التحليلات مقفولة.', unknown: 'التحليلات مقفولة لحد ما توافق.',
-  },
-};
-
-/** Mount once in the storefront. This component never configures or loads GA itself. */
-export default function AnalyticsConsent({ lang }: { lang: Language }) {
+/** Optional measurement starts only after an explicit acceptance. */
+export default function AnalyticsConsent(_props: { lang: Language }) {
   const [consent, setConsent] = useState(getAnalyticsConsent);
   const [expanded, setExpanded] = useState(false);
-  const heading = useRef<HTMLHeadingElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
   const settings = useRef<HTMLButtonElement>(null);
   const id = useId();
-  const text = copy[lang];
   const open = expanded || consent === 'unknown';
 
   useEffect(() => {
     const update = () => setConsent(getAnalyticsConsent());
     window.addEventListener(ANALYTICS_CONSENT_EVENT, update);
-    update();
     return () => window.removeEventListener(ANALYTICS_CONSENT_EVENT, update);
   }, []);
 
-  useEffect(() => { if (expanded) heading.current?.focus(); }, [expanded]);
+  useEffect(() => {
+    if (!open || !dialog.current) return;
+    const panel = dialog.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    panel.showModal();
+    return () => {
+      panel.close();
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
-  const close = () => {
-    setExpanded(false);
-    settings.current?.focus();
-  };
   const choose = (value: Consent) => {
     setAnalyticsConsent(value);
     setConsent(value);
-    close();
+    setExpanded(false);
+    settings.current?.focus();
   };
-  const choiceClass = 'min-h-11 flex-1 rounded-xl border-2 border-gray-900 bg-white px-4 py-3 font-bold text-gray-900 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700';
+  const dismiss = () => {
+    if (consent === 'unknown') choose('rejected');
+    else setExpanded(false);
+  };
 
   return (
-    <aside lang={lang} dir={lang === 'ar' ? 'rtl' : 'ltr'} className="fixed bottom-32 md:bottom-3 left-3 right-3 z-[60] max-w-lg text-gray-900 sm:right-auto">
+    <aside lang="en" dir="ltr" className="privacy-preferences">
       {open && (
-        <section id={`${id}-panel`} role="region" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}
-          className="mb-2 rounded-2xl border border-gray-300 bg-white p-4 shadow-xl"
-          onKeyDown={event => { if (event.key === 'Escape' && consent !== 'unknown') { event.preventDefault(); close(); } }}>
-          <h2 id={`${id}-title`} tabIndex={-1} ref={heading} className="text-lg font-bold">{text.title}</h2>
-          <p id={`${id}-description`} className="my-3 text-sm leading-relaxed">{text.description}</p>
-          <p className="mb-3 text-sm" role="status">{text[consent]}</p>
-          <div className="flex flex-wrap gap-3">
-            <button type="button" className={choiceClass} onClick={() => choose('accepted')}>{text.accept}</button>
-            <button type="button" className={choiceClass} onClick={() => choose('rejected')}>{text.reject}</button>
-          </div>
-          {consent !== 'unknown' && <button type="button" onClick={close} className="mt-3 min-h-11 rounded px-3 underline focus-visible:outline focus-visible:outline-2">{text.close}</button>}
-        </section>
+        <dialog ref={dialog} id={`${id}-panel`} role="dialog" aria-modal="true"
+          aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}
+          className="privacy-dialog"
+          onCancel={event => { event.preventDefault(); dismiss(); }}
+          onClick={event => {
+            if (event.target !== event.currentTarget) return;
+            const bounds = event.currentTarget.getBoundingClientRect();
+            if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dismiss();
+          }}>
+          <h2 id={`${id}-title`} className="storefront-loading__sr">Your privacy preferences</h2>
+          <p id={`${id}-description`} className="privacy-dialog__copy">
+            We use essential storage to keep your cart working. With your permission, optional cookies help us understand how our website is used. Read our{' '}
+            <a href="/privacy">Privacy Policy</a>.
+          </p>
+          <button type="button" autoFocus onClick={() => choose('accepted')} className="privacy-dialog__accept">
+            Accept &amp; Continue
+          </button>
+        </dialog>
       )}
       <button type="button" ref={settings} aria-expanded={open} aria-controls={open ? `${id}-panel` : undefined}
-        onClick={() => { if (expanded && consent !== 'unknown') close(); else setExpanded(true); }}
-        className="min-h-11 rounded-xl border border-gray-400 bg-white px-4 py-2 text-sm font-semibold shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700">
-        {text.settings}
+        onClick={() => consent === 'accepted' ? choose('rejected') : setExpanded(true)} className="privacy-preferences__link">
+        {consent === 'accepted' ? 'Turn off analytics' : 'Privacy settings'}
       </button>
     </aside>
   );

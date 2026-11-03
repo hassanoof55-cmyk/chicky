@@ -2,6 +2,18 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&family=Cairo:wght@400;700;900&family=Changa:wght@400;700;800;900&display=swap');
 
+.privacy-preferences { display: contents; }
+.privacy-preferences__link { min-height: 44px; padding: 0; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.privacy-preferences__link:hover { color: #fff; }
+.privacy-dialog { position: fixed; inset: 0; width: min(470px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 25px 24px; overflow-y: auto; border: 0; border-radius: 38px; background: #1d2025; color: #f7f7f8; font-family: Inter, sans-serif; box-shadow: 0 24px 80px rgba(0,0,0,.2); }
+.privacy-dialog::backdrop { background: rgba(35,37,40,.52); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); }
+.privacy-dialog__copy { font-size: 14px; line-height: 1.65; font-weight: 500; text-align: left; }
+.privacy-dialog__copy a { color: #79b8ff; text-decoration: underline; text-underline-offset: 2px; }
+.privacy-dialog__accept { display: block; width: min(260px, 100%); min-height: 48px; margin: 16px auto 0; padding: 12px 18px; border: 0; border-radius: 5px; background: #e4002b; color: #fff; font: 800 16px/1.5 Inter, sans-serif; text-transform: uppercase; cursor: pointer; transition: background-color 150ms ease; }
+.privacy-dialog__accept:hover { background: #bb0023; }
+.privacy-dialog__accept:focus-visible, .privacy-dialog__copy a:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+.privacy-preferences__link:focus-visible { outline: 2px solid #b90023; outline-offset: 2px; }
+
 .storefront-loading {
   min-height: 100vh;
   min-height: 100svh;

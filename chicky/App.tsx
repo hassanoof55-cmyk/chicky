@@ -436,9 +436,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <Footer config={config} lang={lang} onOpenAdmin={handleOpenAdmin} scrollToCategory={scrollToCategory} />
-      <nav className="flex flex-wrap justify-center gap-6 px-6 py-5 pb-24 md:pb-5 text-sm text-slate-700"><a className="underline underline-offset-4" href="/policies">{isAr ? 'التوصيل ومشكلة في الطلب' : 'Delivery & order issues'}</a><a className="underline underline-offset-4" href="/privacy">{isAr ? 'الخصوصية' : 'Privacy'}</a></nav>
-      <AnalyticsConsent lang={lang} />
+      <Footer config={config} lang={lang} onOpenAdmin={handleOpenAdmin} scrollToCategory={scrollToCategory} privacyControl={<AnalyticsConsent lang={lang} />} />
       {config.header.phone && <WhatsAppFloat phone={config.header.phone} lang={lang} />}
       <MobileBottomNav 
         onOpenCart={() => setIsCartOpen(true)} 
