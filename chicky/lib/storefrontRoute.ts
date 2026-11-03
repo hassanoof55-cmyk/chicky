@@ -1,4 +1,5 @@
 import type { Product, SiteConfig } from '../types';
+import { localRestaurantCopy } from './restaurantInfo.mjs';
 export type StorefrontRoute = {productId:string|null;categoryId:string|null;sizeId:string|null};
 export function storefrontRoute(path:string,search:string):StorefrontRoute {
   const product=path.match(/^\/products\/([^/]+)$/);const category=path.match(/^\/categories\/([^/]+)$/);
@@ -13,5 +14,5 @@ export function routeTitle(menu:Product[],config:Pick<SiteConfig,'layout'>,route
   const size=p?.sizes?.find(s=>s.id===route.sizeId);
   if(p)return `${(isAr?p.nameAr:p.name)||p.nameAr||p.name}${size?` - ${isAr?size.nameAr:size.nameEn}`:''} | CHICKY`;
   if(c)return `${isAr?c.nameAr:c.nameEn} | CHICKY`;
-  return isAr?'CHICKY | منيو تشيكي فرايد تشيكن الإسكندرية':'CHICKY | Fried Chicken Menu in Alexandria';
+  return localRestaurantCopy[isAr ? 'ar' : 'en'].title;
 }
