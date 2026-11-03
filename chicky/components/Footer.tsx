@@ -112,7 +112,7 @@ const Footer: React.FC<FooterProps> = ({ config, lang, onOpenAdmin, scrollToCate
             {isAr ? config.footer.copyrightAr : config.footer.copyrightEn}
           </a>
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
+        <div className={`flex flex-wrap items-center justify-center gap-x-8 gap-y-2 ${isAr ? 'pl-24' : 'pr-24'}`}>
           <a href="/privacy" className="min-h-11 inline-flex items-center hover:text-white transition-colors">PRIVACY</a>
           <a href="/policies" className="min-h-11 inline-flex items-center hover:text-white transition-colors">TERMS</a>
           {privacyControl}
