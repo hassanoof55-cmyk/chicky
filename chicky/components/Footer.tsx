@@ -3,6 +3,7 @@ import React from 'react';
 import { Facebook, Instagram, MapPin, Phone, Settings } from 'lucide-react';
 import { SiteConfig, Language } from '../types';
 import Logo from './Logo';
+import { localRestaurantCopy } from '../lib/restaurantInfo.mjs';
 
 const TikTokIcon = ({ size = 18 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -28,6 +29,7 @@ const Footer: React.FC<FooterProps> = ({ config, lang, onOpenAdmin, scrollToCate
           <Logo src={config.header.logoWhite} variant="white" className="h-16" />
           <p className="text-slate-300 text-base leading-relaxed font-medium">
             {isAr ? config.footer.aboutAr : config.footer.aboutEn}
+            {' '}{localRestaurantCopy[lang].description}
           </p>
           <div className="flex gap-4">
             {[
@@ -75,6 +77,7 @@ const Footer: React.FC<FooterProps> = ({ config, lang, onOpenAdmin, scrollToCate
                 {isAr ? config.footer.addressAr : config.footer.addressEn}
               </p>
             </a>
+            <p className="text-sm text-slate-300 font-medium leading-relaxed">{localRestaurantCopy[lang].hours}</p>
             <a 
               href={`tel:${config.header.phone}`}
               className="flex items-center gap-4 group cursor-pointer"
