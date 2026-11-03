@@ -374,23 +374,27 @@ async function renderConsent(a, lang) {
   return renderToStaticMarkup(React.createElement(Consent, { lang }));
 }
 
-test('the bilingual consent region has equal choices, explicit labels and a persistent settings control', async () => {
+test('the English consent dialog has one acceptance button, a privacy link and a way to withdraw later', async () => {
   const a = await setup();
   const en = await renderConsent(a, 'en');
-  assert.match(en, /role="region"/);
+  assert.match(en, /role="dialog"/);
   assert.match(en, /aria-labelledby=/);
   assert.match(en, /dir="ltr"/);
-  assert.match(en, /Accept analytics/);
-  assert.match(en, /Reject analytics/);
-  assert.match(en, /Analytics settings/);
+  assert.match(en, /Accept &amp; Continue/);
+  assert.match(en, /href="\/privacy"/);
+  assert.equal((en.match(/<dialog[\s\S]*?<\/dialog>/)?.[0].match(/<button/g) || []).length, 1);
+  assert.match(en, /Privacy settings/);
   const ar = await renderConsent(a, 'ar');
-  assert.match(ar, /dir="rtl"/);
-  assert.match(ar, /lang="ar"/);
-  assert.match(ar, /قبول التحليلات/);
-  assert.match(ar, /رفض التحليلات/);
+  assert.match(ar, /dir="ltr"/);
+  assert.match(ar, /lang="en"/);
+  assert.match(ar, /Accept &amp; Continue/);
   a.setAnalyticsConsent('rejected');
   const closed = await renderConsent(a, 'en');
-  assert.doesNotMatch(closed, /role="region"/);
-  assert.match(closed, /Analytics settings/);
+  assert.doesNotMatch(closed, /role="dialog"/);
+  assert.match(closed, /Privacy settings/);
   assert.equal(a.scripts.length, 0);
+  a.setAnalyticsConsent('accepted');
+  const accepted = await renderConsent(a, 'ar');
+  assert.match(accepted, /Turn off analytics/);
+  assert.doesNotMatch(accepted, /role="dialog"/);
 });
