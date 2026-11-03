@@ -366,7 +366,6 @@ const App: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-6 md:px-12 py-16 mb-24 md:mb-0">
         {(route.productId || route.categoryId) && <header className="mb-8"><a className="text-red-700 font-bold underline underline-offset-4" href="/">{isAr ? 'الرجوع للمنيو' : 'Back to menu'}</a><h1 className="text-3xl font-black mt-5">{routeTitle(menu, config, route, isAr).replace(' | CHICKY', '')}</h1></header>}
-        <p className="text-sm text-slate-600 mb-6">{isAr ? 'الأسعار شاملة الضريبة. مصاريف التوصيل بتظهر حسب منطقتك عند إتمام الطلب.' : 'Prices include tax. Delivery fees are shown for your area at checkout.'}</p>
         
         {/* ACTIVE FILTER HEADER */}
         {(activeTag || searchQuery) && (
