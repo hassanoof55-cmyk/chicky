@@ -32,9 +32,11 @@ test('upstream outage is 503 with retry advice, never an empty feed or soft 404'
     const r=await fetch(base+path);assert.equal(r.status,503);assert.equal(r.headers.get('retry-after'),'60');
   }
 },async()=>{throw Error('upstream private detail');}));
-test('public policies reflect owner supplied remedy, inclusive tax and actual local delivery fees',async()=>withServer(async base=>{
+test('public policies reflect owner supplied remedy and tax, with delivery fees reserved for checkout',async()=>withServer(async base=>{
  const html=await(await fetch(base+'/policies')).text();
  assert.match(html,/شاملة الضريبة/);assert.match(html,/طلب جديد/);assert.match(html,/01220062060/);
+ assert.match(html,/٤٠.*٧٠/);assert.match(html,/٥ الفجر/);
+ assert.doesNotMatch(html,/<table>|التوصيل بالجنيه المصري/);
  const privacy=await(await fetch(base+'/privacy')).text();assert.match(privacy,/Google Analytics/);assert.match(privacy,/واتساب/);
 }));
 test('public catalog fetches are coalesced and cached for 60 seconds, and stale data is not served after an outage', async()=>{

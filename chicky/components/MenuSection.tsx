@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { trackCommerce, analyticsItem } from '../lib/analytics';
+import { trackCommerce, analyticsItem, getAnalyticsConsent } from '../lib/analytics';
+import { observeCatalogImpression } from '../lib/catalogImpressions';
 import { Plus, Flame, CheckCircle, X, Sparkles } from 'lucide-react';
 import { Product, Language, CategoryConfig, TagConfig } from '../types';
 
@@ -16,22 +17,20 @@ interface MenuSectionProps {
 
 const MenuSection: React.FC<MenuSectionProps> = ({ category, items, onAddToCart, lang, tagsConfig, initialSizeId, productPage }) => {
   const sectionRef = useRef<HTMLElement>(null);
+  const impressionItems = useRef(items);
+  impressionItems.current = items;
+  const impressionKey = JSON.stringify(items.map(item => item.id));
   useEffect(() => {
     const element = sectionRef.current;
     if (!element) return;
-    let observed = false;
-    const observer = new IntersectionObserver(entries => {
-      if (!observed && entries.some(entry => entry.isIntersecting)) {
-        observed = true;
-        if (productPage && items[0]) {
-          const size = items[0].sizes?.find(s => s.id === initialSizeId) || (items[0].hasSizes ? items[0].sizes?.[0] : undefined);
-          trackCommerce('view_item', [analyticsItem(items[0], 1, size)]);
-        } else trackCommerce('view_item_list', items.map(item => analyticsItem(item, 1, item.hasSizes ? item.sizes?.[0] : undefined)), { item_list_id: category.id, item_list_name: category.nameEn });
-      }
-    }, { threshold: 0.1 });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [items, productPage, initialSizeId, category.id]);
+    return observeCatalogImpression(element, () => {
+        const currentItems = impressionItems.current;
+        if (productPage && currentItems[0]) {
+          const size = currentItems[0].sizes?.find(s => s.id === initialSizeId) || (currentItems[0].hasSizes ? currentItems[0].sizes?.[0] : undefined);
+          trackCommerce('view_item', [analyticsItem(currentItems[0], 1, size)]);
+        } else trackCommerce('view_item_list', currentItems.map(item => analyticsItem(item, 1, item.hasSizes ? item.sizes?.[0] : undefined)), { item_list_id: category.id, item_list_name: category.nameEn });
+    }, () => getAnalyticsConsent() === 'accepted');
+  }, [impressionKey, productPage, initialSizeId, category.id]);
   const [animatingId, setAnimatingId] = useState<string | null>(null);
   const [showOptionsId, setShowOptionsId] = useState<string | null>(null);
   const [tempSelection, setTempSelection] = useState<{ size?: any, spiciness?: any, modifiers?: any[] }>({});
