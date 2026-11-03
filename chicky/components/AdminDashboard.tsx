@@ -31,6 +31,14 @@ interface AdminDashboardProps {
   onUpdateConfig: (newConfig: SiteConfig) => void;
 }
 
+interface AdminOrderStats {
+  totalOrders: number;
+  totalRevenue: number;
+  areaStats: Record<string, { count: number; revenue: number }>;
+  topArea: [string, { count: number; revenue: number }] | undefined;
+  topItem: [string, number] | undefined;
+}
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSignOut, menu, onUpdateMenu, config, onUpdateConfig }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'builder' | 'areas' | 'orders' | 'marketing'>('menu');
   const [builderSubTab, setBuilderSubTab] = useState<'branding' | 'hero' | 'categories' | 'tags' | 'social'>('branding');
@@ -142,7 +150,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
     };
   }, [isOpen]);
 
-  const stats = React.useMemo(() => {
+  const stats: AdminOrderStats = React.useMemo(() => {
     const filteredOrders = orders.filter(o => {
       if (!o.createdAt) return false;
       const matchesDate = filterType === 'day' ? o.createdAt.startsWith(selectedDate) : 
