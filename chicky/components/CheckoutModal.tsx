@@ -3,6 +3,7 @@ import { X, CheckCircle, Truck, MapPin, Phone, User, Loader2, AlertCircle, Layou
 import { OrderDetails, LocationData, Area, CartItem, Language, ServiceType, PromoCode, SiteConfig } from '../types';
 import { supabase } from '../lib/supabase';
 import { persistOrder } from '../lib/orderSubmission';
+import { orderItems } from '../lib/orderDetails';
 import { trackCommerce, analyticsItem, getAnalyticsContext, getAnalyticsConsent } from '../lib/analytics';
 import { rememberAnalyticsReceipt, revokeAnalyticsReceipts } from '../lib/orderAnalytics';
 
@@ -377,6 +378,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
+    if (isScheduling && !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(scheduledTime)) {
+      setSubmissionError(isAr ? 'برجاء اختيار موعد صحيح للطلب.' : 'Please choose a valid order time.');
+      timeInputRef.current?.focus();
+      return;
+    }
+
     submissionPending.current = true;
     setSubmitting(true);
     setSubmissionError('');
@@ -397,16 +404,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         payment_method: paymentMethod,
         area: selectedArea ? (isAr ? selectedArea.nameAr : selectedArea.nameEn) : 'Pickup/Dine-In',
         location: details.serviceType === 'delivery' ? location : {},
-        items: cartItems?.map(item => ({
-          id: item.id,
-          category: item.category,
-          name: isAr ? item.nameAr : item.name,
-          quantity: item.quantity,
-          price: item.price,
-          spiciness: item.selectedSpiciness,
-          size: item.selectedSize ? (isAr ? item.selectedSize.nameAr : item.selectedSize.nameEn) : null,
-          size_id: item.selectedSize?.id || null
-        })) || [],
+        language: lang,
+        scheduled_time: isScheduling ? scheduledTime : null,
+        items: orderItems(cartItems || [], lang),
         total_price: finalTotal,
         status: 'pending'
       }, appliedPromo?.code || null);

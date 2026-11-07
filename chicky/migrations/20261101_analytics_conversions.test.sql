@@ -2,10 +2,11 @@
 -- Dedicated disposable database only; fixtures and assertions always roll back.
 BEGIN;
 
-INSERT INTO public.menu_items(id,name,"nameAr",price,category,sizes)
-VALUES ('analytics-test-catalog','Catalog chicken','كتالوج',30,'test',
+INSERT INTO public.menu_items(id,name,"nameAr",price,category,"hasSizes",sizes,modifiers)
+VALUES ('analytics-test-catalog','Catalog chicken','كتالوج',30,'test',true,
   '[{"id":"regular","nameEn":"Regular","nameAr":"عادي","price":30},
-    {"id":"large","nameEn":"Large","nameAr":"كبير","price":35}]');
+    {"id":"large","nameEn":"Large","nameAr":"كبير","price":35}]',
+  '[{"id":"extra-30","nameEn":"Extra","price":30},{"id":"extra-5","nameEn":"Small extra","price":5}]');
 INSERT INTO public.promo_codes(code,discount_type,discount_value,is_active,usage_limit)
 VALUES ('ANALYTICS_TEST','fixed',10,true,1);
 -- Restore automatically on ROLLBACK, including an absent/empty areas array.
@@ -28,9 +29,9 @@ SELECT n, jsonb_build_object(
   'service_type','delivery','area_id','analytics-test-area',
   'items',jsonb_build_array(
     jsonb_build_object('id','analytics-test-catalog','name','PRIVATE_ITEM_SENTINEL',
-      'size_id','regular','size','PRIVATE_SIZE_SENTINEL','price',60,'quantity',2),
+      'size_id','regular','modifier_ids',jsonb_build_array('extra-30'),'size','PRIVATE_SIZE_SENTINEL','price',60,'quantity',2),
     jsonb_build_object('id','analytics-test-catalog','name','PRIVATE_ITEM_SENTINEL',
-      'size','كبير','price',40,'quantity',1)),
+      'size_id','large','modifier_ids',jsonb_build_array('extra-5'),'size','كبير','price',40,'quantity',1)),
   'total_price',CASE WHEN n=1 THEN 157 ELSE 167 END,
   'analytics',jsonb_build_object('consent',true,'client_id','123.456','session_id','789',
     'revoke_token','acacacac-0000-4000-8000-' || lpad(n::text,12,'0'),
@@ -42,7 +43,7 @@ UPDATE analytics_fixtures SET p=jsonb_set(p,'{analytics,client_id}','"bad@exampl
 UPDATE analytics_fixtures SET p=jsonb_set(p,'{analytics,revoke_token}','"not-a-uuid"') WHERE n=11;
 UPDATE analytics_fixtures SET p=jsonb_set(p,'{analytics,session_id}','"not-digits"') WHERE n=12;
 UPDATE analytics_fixtures SET p=jsonb_set(p,'{analytics,consent}','"true"') WHERE n=14;
-UPDATE analytics_fixtures SET p=jsonb_set(p,'{items,0,size_id}','"unrecognized-size"') WHERE n=15;
+-- Malformed historical size coverage is injected after valid submission below.
 GRANT SELECT ON analytics_fixtures TO anon, authenticated, service_role;
 
 SET LOCAL ROLE anon;
@@ -113,6 +114,12 @@ DO $$ DECLARE t text; BEGIN
 END $$;
 RESET ROLE;
 
+-- Simulate a historical malformed item that the new submission core now rejects.
+UPDATE public.orders SET items=jsonb_set(items,'{0,size_id}','"unrecognized-size"')
+WHERE id IN (SELECT p->>'id' FROM analytics_fixtures WHERE n=15);
+-- Keep coverage of the analytics fallback for pre-upgrade label-only sizes.
+UPDATE public.orders SET items=jsonb_set(items,'{1}',(items->1)-'size_id')
+WHERE id IN (SELECT p->>'id' FROM analytics_fixtures WHERE n=1);
 -- Revoke before completion; unknown tokens must be harmless and return void.
 SET LOCAL ROLE anon;
 SELECT public.revoke_chicky_analytics('acacacac-0000-4000-8000-000000000003');
