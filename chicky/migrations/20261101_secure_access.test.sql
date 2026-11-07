@@ -1,4 +1,7 @@
 BEGIN;
+INSERT INTO public.menu_items(id,name,"nameAr",price,category,"hasSizes","spicinessOption")
+VALUES ('access-test-catalog','Access fixture','اختبار',100,'test',false,false);
+
 SET LOCAL ROLE anon;
 DO $$ BEGIN
   IF public.is_chicky_admin() THEN RAISE EXCEPTION 'Anonymous administrator'; END IF;
@@ -10,7 +13,7 @@ END $$;
 SELECT public.submit_chicky_order(jsonb_build_object('id','CH-00000000-0000-0000-0000-000000000001',
   'customer_name','Migration Test','phone','00000000000','address','TEST ONLY','service_type','pickup',
   'items',jsonb_build_array(jsonb_build_object('id',id,'price',price,'quantity',1)),'total_price',price,'status','completed'))
-FROM public.menu_items WHERE price>0 LIMIT 1;
+FROM public.menu_items WHERE id='access-test-catalog' LIMIT 1;
 RESET ROLE;
 DO $$ BEGIN
   IF NOT EXISTS(SELECT 1 FROM public.orders WHERE id='CH-00000000-0000-0000-0000-000000000001' AND status='pending') THEN
@@ -34,14 +37,14 @@ SELECT set_config('request.jwt.claims','{"role":"anon"}',true);
 SELECT public.submit_chicky_order(jsonb_build_object('id','CH-00000000-0000-0000-0000-000000000002',
   'customer_name','Migration Test','phone','00000000000','address','TEST ONLY','service_type','pickup',
   'items',jsonb_build_array(jsonb_build_object('id',id,'price',price,'quantity',1)),'total_price',price-1),'MIGRATION_TEST')
-FROM public.menu_items WHERE price>1 LIMIT 1;
+FROM public.menu_items WHERE id='access-test-catalog' LIMIT 1;
 -- A lost HTTP response must not create a duplicate or consume the promo again.
 SELECT public.submit_chicky_order(jsonb_build_object('id','CH-00000000-0000-0000-0000-000000000002',
   'customer_name','Migration Test','phone','00000000000','address','TEST ONLY','service_type','pickup',
   'items',jsonb_build_array(jsonb_build_object('id',id,'price',price,'quantity',1)),'total_price',price-1),'MIGRATION_TEST')
-FROM public.menu_items WHERE price>1 LIMIT 1;
+FROM public.menu_items WHERE id='access-test-catalog' LIMIT 1;
 DO $$ DECLARE item public.menu_items%ROWTYPE; BEGIN
-  SELECT * INTO item FROM public.menu_items WHERE price>1 LIMIT 1;
+  SELECT * INTO item FROM public.menu_items WHERE id='access-test-catalog' LIMIT 1;
   BEGIN
     PERFORM public.submit_chicky_order(jsonb_build_object('id','CH-00000000-0000-0000-0000-000000000003',
       'customer_name','Migration Test','phone','00000000000','address','TEST ONLY','service_type','pickup',
