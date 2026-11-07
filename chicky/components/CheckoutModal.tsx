@@ -378,6 +378,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
+    if (isScheduling && !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(scheduledTime)) {
+      setSubmissionError(isAr ? 'برجاء اختيار موعد صحيح للطلب.' : 'Please choose a valid order time.');
+      timeInputRef.current?.focus();
+      return;
+    }
+
     submissionPending.current = true;
     setSubmitting(true);
     setSubmissionError('');
