@@ -6,6 +6,7 @@ export async function persistOrder(client: any, order: Record<string, unknown>, 
   const id = storage.getItem(key) || 'CH-' + crypto.randomUUID().toUpperCase();
   storage.setItem(key, id);
   const { error } = await client.rpc('submit_chicky_order', { p_order: { ...order, id }, p_promo_code: promoCode });
+  if (error?.code === 'PT429') throw new Error('وصلت للحد المسموح من الطلبات. استنى ١٠ دقائق وحاول تاني.');
   if (error) throw new Error('تعذر حفظ الطلب. جرّب تاني قبل ما تقفل الصفحة.');
   storage.removeItem(key);
   return id;

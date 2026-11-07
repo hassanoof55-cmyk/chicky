@@ -4,6 +4,14 @@ import { persistOrder } from '../lib/orderSubmission.ts';
 const storage = () => { const m=new Map();return {getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k)}; };
 const order={customer_name:'Migration Test',status:'pending',items:[{id:'item',quantity:1,price:50}],total_price:50};
 
+test('rate limits explain the wait and retain the retry ID', async () => {
+  const savedStorage=storage(), ids=[];
+  const client={async rpc(name,args){ids.push(args.p_order.id);return {error:ids.length===1?{code:'PT429'}:null};}};
+  await assert.rejects(persistOrder(client,order,null,savedStorage),/١٠ دقائق/);
+  await persistOrder(client,order,null,savedStorage);
+  assert.equal(ids[0],ids[1]);
+});
+
 test('a rejected order is not reported as saved', async () => {
   const client = { from() { return { async insert() { return { error: null }; } }; }, async rpc() { return { error: { message: 'denied' } }; } };
   await assert.rejects(persistOrder(client, order, null, storage()), /تعذر حفظ الطلب/);
