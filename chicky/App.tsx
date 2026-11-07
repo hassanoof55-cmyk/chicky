@@ -1,3 +1,4 @@
+import { matchesCartLine } from './lib/cartLine';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Navbar from './components/Navbar';
 import MenuSection from './components/MenuSection';
@@ -259,14 +260,10 @@ const App: React.FC = () => {
   };
 
   const updateQuantity = (id: string, delta: number, spiciness?: 'Normal' | 'Spicy', price?: number, sizeId?: string, modifiersJson?: string) => {
-    const target = cart.find(item => item.id === id && item.selectedSpiciness === spiciness && (price === undefined || item.price === price) && (sizeId === undefined || item.selectedSize?.id === sizeId) && (modifiersJson === undefined || JSON.stringify(item.selectedModifiers || []) === modifiersJson));
+    const target = cart.find(item => matchesCartLine(item, id, spiciness, price, sizeId, modifiersJson));
     if (target && (delta > 0 || target.quantity > 1)) trackCommerce(delta > 0 ? 'add_to_cart' : 'remove_from_cart', [analyticsItem(target, 1, target.selectedSize, target.price)]);
     setCart(prev => prev?.map(item => {
-      if (item.id === id && 
-          item.selectedSpiciness === spiciness && 
-          (price === undefined || item.price === price) &&
-          (sizeId === undefined || item.selectedSize?.id === sizeId) &&
-          (modifiersJson === undefined || JSON.stringify(item.selectedModifiers || []) === modifiersJson)) {
+      if (matchesCartLine(item, id, spiciness, price, sizeId, modifiersJson)) {
         const newQty = Math.max(1, item.quantity + delta);
         return { ...item, quantity: newQty };
       }
@@ -274,10 +271,10 @@ const App: React.FC = () => {
     }));
   };
 
-  const removeFromCart = (id: string, spiciness?: 'Normal' | 'Spicy', price?: number) => {
-    const removed = cart.filter(item => item.id === id && item.selectedSpiciness === spiciness && (price === undefined || item.price === price));
+  const removeFromCart = (id: string, spiciness?: 'Normal' | 'Spicy', price?: number, sizeId?: string, modifiersJson?: string) => {
+    const removed = cart.filter(item => matchesCartLine(item, id, spiciness, price, sizeId, modifiersJson));
     if (removed.length) trackCommerce('remove_from_cart', removed.map(item => analyticsItem(item, item.quantity, item.selectedSize, item.price)));
-    setCart(prev => prev.filter(item => !(item.id === id && item.selectedSpiciness === spiciness && (price === undefined || item.price === price))));
+    setCart(prev => prev.filter(item => !matchesCartLine(item, id, spiciness, price, sizeId, modifiersJson)));
   };
 
   const handleConfirmOrder = (details: OrderDetails) => {

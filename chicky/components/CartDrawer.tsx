@@ -8,8 +8,8 @@ interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   items: CartItem[];
-  onUpdateQuantity: (id: string, delta: number, spiciness?: 'Normal' | 'Spicy', price?: number) => void;
-  onRemove: (id: string, spiciness?: 'Normal' | 'Spicy', price?: number) => void;
+  onUpdateQuantity: (id: string, delta: number, spiciness?: 'Normal' | 'Spicy', price?: number, sizeId?: string, modifiersJson?: string) => void;
+  onRemove: (id: string, spiciness?: 'Normal' | 'Spicy', price?: number, sizeId?: string, modifiersJson?: string) => void;
   onCheckout: () => void;
   // Added lang prop to interface
   lang: Language;

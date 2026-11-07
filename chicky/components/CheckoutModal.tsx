@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, CheckCircle, Truck, MapPin, Phone, User, Loader2, AlertCircle, LayoutList, Map as MapIcon, ChevronRight, ChevronLeft, MessageSquare, Send, Navigation, ShoppingBag, Utensils, Clock, Tag, Sparkles, Search, Wallet, Coins, Smartphone, ArrowUp, LocateFixed } from 'lucide-react';
 import { OrderDetails, LocationData, Area, CartItem, Language, ServiceType, PromoCode, SiteConfig } from '../types';
 import { supabase } from '../lib/supabase';
-import { persistOrder } from '../lib/orderSubmission';
+import { persistOrder, orderSubmissionErrorMessage } from '../lib/orderSubmission';
 import { orderItems } from '../lib/orderDetails';
 import { trackCommerce, analyticsItem, getAnalyticsContext, getAnalyticsConsent } from '../lib/analytics';
 import { rememberAnalyticsReceipt, revokeAnalyticsReceipts } from '../lib/orderAnalytics';
@@ -416,7 +416,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         void revokeAnalyticsReceipts(supabase);
       }
     } catch (e) {
-      setSubmissionError(isAr ? 'تعذر حفظ الطلب. جرّب تاني قبل ما تقفل الصفحة.' : 'Your order could not be saved. Please try again.');
+      setSubmissionError(orderSubmissionErrorMessage(e, lang));
       submissionPending.current = false;
       setSubmitting(false);
       return;

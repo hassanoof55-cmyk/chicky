@@ -22,7 +22,7 @@ END $$;
 CREATE TEMP TABLE analytics_fixtures AS
 SELECT n, jsonb_build_object(
   'id','CH-ACACACAC-0000-0000-0000-' || lpad(n::text,12,'0'),
-  'customer_name','PRIVATE_CUSTOMER_SENTINEL','phone','01234567890',
+  'customer_name','PRIVATE_CUSTOMER_SENTINEL','phone','0109'||lpad(n::text,7,'0'),
   'address','PRIVATE_ADDRESS_SENTINEL','area','PRIVATE_AREA_SENTINEL',
   'location',jsonb_build_object('lat',31.234567,'lng',30.123456),
   'notes','PRIVATE_NOTES_SENTINEL','payment_method','cash',
@@ -171,7 +171,7 @@ DO $$ DECLARE e jsonb; BEGIN
     RAISE EXCEPTION 'Discounted items do not reconcile'; END IF;
   IF EXISTS (SELECT 1 FROM public.chicky_analytics_outbox
     WHERE order_id LIKE 'CH-ACACACAC-%' AND
-      (payload::text ~ 'PRIVATE_|01234567890|31[.]234567|30[.]123456|123[.]456'
+      (payload::text ~ 'PRIVATE_|01090000001|31[.]234567|30[.]123456|123[.]456'
        OR payload->'params' ?| ARRAY['tax','customer_name','phone','address','location',
          'notes','order_details','p_order','client_id','session_id']
        OR payload ?| ARRAY['client_id','session_id'])) THEN
