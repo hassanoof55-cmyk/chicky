@@ -1,3 +1,4 @@
+import { disposeLeafletMap } from '../lib/leafletCleanup';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, CheckCircle, Truck, MapPin, Phone, User, Loader2, AlertCircle, LayoutList, Map as MapIcon, ChevronRight, ChevronLeft, MessageSquare, Send, Navigation, ShoppingBag, Utensils, Clock, Tag, Sparkles, Search, Wallet, Coins, Smartphone, ArrowUp, LocateFixed } from 'lucide-react';
 import { OrderDetails, LocationData, Area, CartItem, Language, ServiceType, PromoCode, SiteConfig } from '../types';
@@ -254,7 +255,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           mapRef.current.invalidateSize();
         }
       }, 200);
-      return () => clearTimeout(timer);
+      return () => { clearTimeout(timer); disposeLeafletMap(mapRef, markerRef); };
     }
   }, [step, locationMethod, isOpen, details.serviceType]);
 

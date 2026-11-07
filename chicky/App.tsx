@@ -63,6 +63,8 @@ const App: React.FC = () => {
 
 
 
+  const configRevisionRef = useRef(0);
+
   // --- CLEAN DATA FETCHING & REAL-TIME ---
   useEffect(() => {
     let active = true;
@@ -72,10 +74,11 @@ const App: React.FC = () => {
       if (inFlight) { pending = true; return; }
       inFlight = true;
       try {
+        const configRevision = configRevisionRef.current;
         const fetched = await loadStorefront(supabase);
         if (!active) return;
         setMenu(fetched.menu);
-        setConfig(fetched.config);
+        if (configRevision === configRevisionRef.current) setConfig(fetched.config);
         setDataStatus('ready');
       } catch (err) {
         if (!active) return;
@@ -167,6 +170,7 @@ const App: React.FC = () => {
   };
 
   const updateConfig = (newConfig: SiteConfig) => {
+    configRevisionRef.current++;
     setConfig(newConfig);
   };
 
