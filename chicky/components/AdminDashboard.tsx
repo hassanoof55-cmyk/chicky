@@ -1,3 +1,5 @@
+import { createAdminConfigSaver, ConfigSaveStatus, upsertConfigEntry } from '../lib/adminConfig';
+import { disposeLeafletMap } from '../lib/leafletCleanup';
 import { mapStoredOrder } from '../lib/orderDetails';
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -40,7 +42,23 @@ interface AdminOrderStats {
   topItem: [string, number] | undefined;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSignOut, menu, onUpdateMenu, config, onUpdateConfig }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSignOut, menu, onUpdateMenu, config: persistedConfig, onUpdateConfig }) => {
+  const [config, setDraftConfig] = useState(persistedConfig);
+  const [configSaveStatus, setConfigSaveStatus] = useState<ConfigSaveStatus | 'dirty' | null>(null);
+  const configSaveStatusRef = useRef<ConfigSaveStatus | 'dirty' | null>(null);
+  const [actionError, setActionError] = useState('');
+  const [configBusy, setConfigBusy] = useState(false);
+  const configSaver = useRef<ReturnType<typeof createAdminConfigSaver> | null>(null);
+  if (!configSaver.current) configSaver.current = createAdminConfigSaver(supabase, {
+    onDraft: setDraftConfig, onSaved: onUpdateConfig, onBusy: setConfigBusy,
+    onStatus: status => { configSaveStatusRef.current = status; setConfigSaveStatus(status); }
+  });
+  useEffect(() => {
+    if (!['saving', 'dirty', 'error'].includes(configSaveStatusRef.current || '')) setDraftConfig(persistedConfig);
+  }, [persistedConfig]);
+  const editConfig = (next: SiteConfig) => {
+    configSaver.current!.stage(next);
+  };
   const [activeTab, setActiveTab] = useState<'menu' | 'builder' | 'areas' | 'orders' | 'marketing'>('menu');
   const [builderSubTab, setBuilderSubTab] = useState<'branding' | 'hero' | 'categories' | 'tags' | 'social'>('branding');
   const [orders, setOrders] = useState<StoredOrder[]>([]);
@@ -64,6 +82,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
   const [editingBanner, setEditingBanner] = useState<Partial<HeroBanner> | null>(null);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
 
+  const pendingCategoryId = useRef<string | null>(null);
+  const pendingTagId = useRef<string | null>(null);
+  const pendingBannerId = useRef<string | null>(null);
+  const pendingAreaId = useRef<string | null>(null);
   const [newCat, setNewCat] = useState({ en: '', ar: '' });
   const [newTag, setNewTag] = useState({ en: '', ar: '' });
 
@@ -85,23 +107,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
 
     // 1. Fetch Initial Orders from Supabase
     const fetchOrders = async () => {
+      try {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
+      if (error) throw error;
+      if (data) {
         const mappedOrders = data.map(mapStoredOrder);
         setOrders(mappedOrders);
       }
+      } catch { setActionError('تعذر تحميل الطلبات. أعد فتح القسم أو راجع الاتصال.'); }
     };
 
     fetchOrders();
 
     // 3. Fetch Promo Codes
     const fetchPromoCodes = async () => {
-      const { data, error } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
-      if (!error && data) setPromoCodes(data);
+      try {
+        const { data, error } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        if (data) setPromoCodes(data);
+      } catch { setActionError('تعذر تحميل أكواد الخصم. راجع الاتصال.'); }
     };
     fetchPromoCodes();
 
@@ -178,7 +206,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
     setLocalFilterLabelAr(config.filterLabelAr || '');
   }, [config.filterLabelEn, config.filterLabelAr]);
 
-  useEffect(() => {
+  const drawingPointsRef = useRef(currentPolygonPoints);
+  drawingPointsRef.current = currentPolygonPoints;
+  const mapColorRef = useRef(config.theme.primaryColor);
+  mapColorRef.current = config.theme.primaryColor;
+  const redrawDrawing = () => {
     if (!drawingLayerRef.current) return;
     drawingLayerRef.current.clearLayers();
     if (currentPolygonPoints.length > 0) {
@@ -202,7 +234,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
         }).addTo(drawingLayerRef.current);
       }
     }
-  }, [currentPolygonPoints, config.theme.primaryColor]);
+  };
+  useEffect(redrawDrawing, [currentPolygonPoints, config.theme.primaryColor]);
 
   useEffect(() => {
     if (activeTab === 'areas' && isOpen) {
@@ -214,18 +247,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
           drawingLayerRef.current = L.layerGroup().addTo(adminMapRef.current);
           ghostLayerRef.current = L.layerGroup().addTo(adminMapRef.current);
           existingZonesLayerRef.current = L.layerGroup().addTo(adminMapRef.current);
+          redrawDrawing();
 
           adminMapRef.current.on('click', (e: any) => {
-            if (!drawingModeRef.current) return;
+            if (!drawingModeRef.current || configSaver.current!.isSaving()) return;
             setCurrentPolygonPoints(prev => [...prev, [e.latlng.lat, e.latlng.lng]]);
           });
 
           adminMapRef.current.on('mousemove', (e: any) => {
-            if (!drawingModeRef.current || currentPolygonPoints.length === 0) return;
+            if (!drawingModeRef.current || drawingPointsRef.current.length === 0) return;
             ghostLayerRef.current.clearLayers();
-            const last = currentPolygonPoints[currentPolygonPoints.length - 1];
+            const last = drawingPointsRef.current[drawingPointsRef.current.length - 1];
             L.polyline([last, [e.latlng.lat, e.latlng.lng]], {
-              color: config.theme.primaryColor,
+              color: mapColorRef.current,
               dashArray: '5,10',
               opacity: 0.5
             }).addTo(ghostLayerRef.current);
@@ -237,6 +271,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
       return () => clearTimeout(timer);
     }
   }, [activeTab, isOpen, config.areas, config.theme.primaryColor]);
+
+  useEffect(() => () => disposeLeafletMap(adminMapRef, drawingLayerRef, ghostLayerRef, existingZonesLayerRef), [activeTab, isOpen]);
 
   const refreshExistingZones = () => {
     if (!existingZonesLayerRef.current) return;
@@ -335,77 +371,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
     }
   };
 
-  const syncConfig = async (newConfig: SiteConfig) => {
-    onUpdateConfig(newConfig);
-    try {
-      // 1. Sync to site_settings (Standard config storage)
-      const { error } = await supabase
-        .from('site_settings')
-        .upsert({ 
-          id: 'active_config', 
-          config_data: newConfig
-        });
+  const syncConfig = (newConfig: SiteConfig) => configSaver.current!.save(newConfig);
 
-      if (error) {
-        console.error('Supabase Sync Error (site_settings):', error);
-        alert('Failed to sync changes to site_settings: ' + error.message);
-      } else {
-        console.log('Successfully synced to site_settings');
-      }
-
-      // 2. Sync to logistics_config (Specific table shown in Supabase dashboard)
-      const { error: logisticsError } = await supabase
-        .from('logistics_config')
-        .upsert({
-          id: 1,
-          areas: newConfig.areas,
-          status: newConfig.branchStatus,
-          updated_at: new Date().toISOString()
-        });
-      
-      if (logisticsError) {
-        console.error('Supabase Sync Error (logistics_config):', logisticsError);
-        // We'll keep this as a console error for now to avoid double alerts, 
-        // but it ensures the data is reflected if the table exists.
-      } else {
-        console.log('Successfully synced to logistics_config');
-      }
-
-    } catch (err: any) {
-      console.error('Config sync failed:', err);
-      alert('Network error while saving to cloud.');
-    }
-  };
-
-  const handleSaveBanner = (e: React.FormEvent) => {
+  const handleSaveBanner = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingBanner) return;
-    const banners = [...config.hero.banners];
-    if (editingBanner.id) {
-      const idx = banners.findIndex(b => b.id === editingBanner.id);
-      banners[idx] = editingBanner as HeroBanner;
-    } else {
-      banners.push({ ...editingBanner, id: 'b' + Date.now() } as HeroBanner);
+    if (!editingBanner || configSaver.current!.isSaving()) return;
+    const id = editingBanner.id || pendingBannerId.current || 'b' + Date.now();
+    pendingBannerId.current = id;
+    const banner = { ...editingBanner, id } as HeroBanner;
+    const banners = upsertConfigEntry(config.hero.banners, banner);
+    if (await syncConfig({ ...config, hero: { banners } })) {
+      pendingBannerId.current = null;
+      setIsBannerFormOpen(false);
     }
-
-    syncConfig({ ...config, hero: { banners } });
-    setIsBannerFormOpen(false);
   };
 
-  const handleAddCategory = () => {
-    if (!newCat.en.trim() || !newCat.ar.trim()) return;
-    const newLayout = [...config.layout, { id: 'cat_' + Date.now(), nameEn: newCat.en.trim(), nameAr: newCat.ar.trim() }];
-    syncConfig({ ...config, layout: newLayout });
-    setNewCat({ en: '', ar: '' });
+  const handleAddCategory = async () => {
+    if (configSaver.current!.isSaving() || !newCat.en.trim() || !newCat.ar.trim()) return;
+    const id = pendingCategoryId.current || 'cat_' + Date.now();
+    pendingCategoryId.current = id;
+    const category = { id, nameEn: newCat.en.trim(), nameAr: newCat.ar.trim() };
+    const newLayout = upsertConfigEntry(config.layout, category);
+    if (await syncConfig({ ...config, layout: newLayout })) {
+      pendingCategoryId.current = null; setNewCat({ en: '', ar: '' });
+    }
   };
 
-  const handleAddTag = () => {
-    const en = newTag.en.trim();
-    const ar = newTag.ar.trim();
-    if (!en || !ar) return;
-    const tag = { id: 'tag_' + Date.now(), nameEn: en, nameAr: ar };
-    syncConfig({ ...config, tags: [...config.tags, tag] });
-    setNewTag({ en: '', ar: '' });
+  const handleAddTag = async () => {
+    const en = newTag.en.trim(), ar = newTag.ar.trim();
+    if (configSaver.current!.isSaving() || !en || !ar) return;
+    const id = pendingTagId.current || 'tag_' + Date.now();
+    pendingTagId.current = id;
+    const tag = { id, nameEn: en, nameAr: ar };
+    const tags = upsertConfigEntry(config.tags, tag);
+    if (await syncConfig({ ...config, tags })) { pendingTagId.current = null; setNewTag({ en: '', ar: '' }); }
   };
 
   const moveCategory = (index: number, direction: 'up' | 'down') => {
@@ -451,6 +450,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
   };
 
 
+  const requestClose = () => {
+    if (configSaver.current!.isSaving()) { setActionError('انتظر انتهاء الحفظ قبل إغلاق لوحة الإدارة.'); return; }
+    onClose();
+  };
+  const requestSignOut = () => {
+    if (configSaver.current!.isSaving()) { setActionError('انتظر انتهاء الحفظ قبل تسجيل الخروج.'); return; }
+    void onSignOut();
+  };
   if (!isOpen) return null;
 
   const inputStyle = "w-full p-4 bg-white border-2 border-slate-200 rounded-2xl outline-none focus:border-red-600 transition-all font-black text-slate-900 text-base shadow-sm";
@@ -460,7 +467,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
   return (
     <>
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 md:p-6 dashboard-main-container">
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm no-print" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm no-print" onClick={requestClose} />
       <div className="relative bg-slate-50 w-full h-full md:h-[95vh] md:rounded-[4rem] shadow-2xl flex flex-col overflow-hidden border-[12px] border-white no-print">
 
         <div className="w-full bg-slate-50 border-b-2 border-slate-100 flex items-center justify-between px-10 py-6 shrink-0">
@@ -482,16 +489,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
           </div>
 
           <div className="flex items-center gap-4">
-            <button onClick={onSignOut} className="px-4 py-3 text-red-600 font-bold rounded-xl hover:bg-red-50">تسجيل الخروج</button>
-            <button onClick={onClose} className="flex items-center gap-3 px-6 py-4 bg-red-50 text-red-600 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm group">
+            <button onClick={requestSignOut} className="px-4 py-3 text-red-600 font-bold rounded-xl hover:bg-red-50">تسجيل الخروج</button>
+            <button onClick={requestClose} className="flex items-center gap-3 px-6 py-4 bg-red-50 text-red-600 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm group">
               <RotateCcw size={16} className="group-hover:-rotate-90 transition-transform" /> Back to App
             </button>
-            <button onClick={onClose} className="p-4 bg-slate-200 hover:bg-red-600 hover:text-white rounded-full transition-all text-slate-500">
+            <button onClick={requestClose} className="p-4 bg-slate-200 hover:bg-red-600 hover:text-white rounded-full transition-all text-slate-500">
               <X size={20} />
             </button>
           </div>
         </div>
 
+        {configSaveStatus && <div role={configSaveStatus === 'error' ? 'alert' : 'status'} className="px-10 py-3 bg-slate-100 text-sm text-slate-800" dir="rtl">
+          {configSaveStatus === 'saving' ? 'جاري حفظ الإعدادات…' : configSaveStatus === 'saved' ? 'تم حفظ الإعدادات.' : configSaveStatus === 'dirty' ? 'تعديلات غير محفوظة.' : 'تعذر حفظ الإعدادات. التعديلات ما زالت متاحة هنا؛ أعد المحاولة.'}
+          {configSaveStatus === 'error' && <button onClick={() => void syncConfig(config)} className="mr-4 font-bold underline">إعادة الحفظ</button>}
+        </div>}
+        {actionError && <div role="alert" className="px-10 py-3 bg-red-50 text-red-700" dir="rtl">{actionError}<button onClick={() => setActionError('')} className="mr-4 underline">إغلاق</button></div>}
         <div className="flex-1 overflow-hidden flex flex-col bg-white">
           <div className="flex-1 overflow-y-auto no-scrollbar p-12 bg-slate-50/50">
 
@@ -735,17 +747,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
 
                         <div className="flex gap-4 pt-4 border-t border-slate-50">
                           <button onClick={async () => {
+                            setActionError('');
+                            try {
                             const { error } = await supabase.from('orders').update({ status: 'completed' }).eq('id', order.id);
+                            if (error) throw error;
                             if (!error) {
                               setOrders(prev => prev?.map(o => o.id === order.id ? { ...o, status: 'completed' as const } : o));
                             }
+                            } catch { setActionError('تعذر تغيير حالة الطلب. حاول مرة أخرى.'); }
                           }} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-green-600 transition-all active:scale-95 shadow-lg">Mark as Completed</button>
 
                           <button onClick={async () => {
+                            setActionError('');
+                            try {
                             const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id);
+                            if (error) throw error;
                             if (!error) {
                               setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'cancelled' as const } : o));
                             }
+                            } catch { setActionError('تعذر تغيير حالة الطلب. حاول مرة أخرى.'); }
                           }} className="py-4 px-8 bg-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-50 hover:text-red-600 transition-all active:scale-95">Cancel</button>
                         </div>
                       </div>
@@ -885,8 +905,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                 <button 
                   onClick={async () => {
                     if (!newPromo.code) return;
-                    await supabase.from('promo_codes').upsert(newPromo);
+                    setActionError('');
+                    try {
+                    const { data, error } = await supabase.from('promo_codes').upsert(newPromo).select().single();
+                    if (error) throw error;
+                    setPromoCodes(prev => [data, ...prev.filter(p => p.code !== data.code)]);
                     setNewPromo({ code: '', discount_type: 'percentage', discount_value: 0, min_order_value: 0, applicable_categories: [], applicable_products: [] });
+                    } catch { setActionError('تعذر حفظ كود الخصم. البيانات ما زالت في النموذج؛ حاول مرة أخرى.'); }
                   }}
                   className="w-full bg-slate-950 text-white py-6 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-red-600 transition-all shadow-xl shadow-slate-200"
                 >
@@ -900,7 +925,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                       <div className="flex justify-between items-start mb-10">
                         <div className="p-4 bg-slate-50 rounded-2xl"><TagIcon size={24} className="text-red-600" /></div>
                         <button 
-                          onClick={async () => { if(confirm('Delete promo?')) await supabase.from('promo_codes').delete().eq('code', pc.code); }}
+                          onClick={async () => { if (!confirm('Delete promo?')) return; setActionError(''); try { const { error } = await supabase.from('promo_codes').delete().eq('code', pc.code); if (error) throw error; setPromoCodes(prev => prev.filter(p => p.code !== pc.code)); } catch { setActionError('تعذر حذف كود الخصم. حاول مرة أخرى.'); } }}
                           className="p-3 text-slate-300 hover:text-red-600 transition-colors"
                         >
                           <Trash2 size={24} />
@@ -943,7 +968,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{pc.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
                          </div>
                          <button 
-                           onClick={async () => await supabase.from('promo_codes').update({ is_active: !pc.is_active }).eq('code', pc.code)}
+                           onClick={async () => { setActionError(''); try { const { data, error } = await supabase.from('promo_codes').update({ is_active: !pc.is_active }).eq('code', pc.code).select().single(); if (error) throw error; setPromoCodes(prev => prev.map(p => p.code === data.code ? data : p)); } catch { setActionError('تعذر تغيير حالة كود الخصم. حاول مرة أخرى.'); } }}
                            className="text-[10px] font-black text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl uppercase tracking-widest"
                          >
                            TOGGLE STATUS
@@ -993,7 +1018,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                     <div className="space-y-8 animate-reveal">
                       <div className="flex justify-between items-center bg-white p-10 rounded-[3.5rem] shadow-sm border border-slate-100">
                         <h3 className="text-3xl font-black brand-font uppercase text-slate-900">Slider Campaigns</h3>
-                        <button onClick={() => { setEditingBanner({ titleEn: '', titleAr: '', image: '', offerPrice: 0, originalPrice: 0, offerLabelEn: '', offerLabelAr: '', promoTagEn: '', promoTagAr: '' }); setIsBannerFormOpen(true); }}
+                        <button onClick={() => { pendingBannerId.current = null; setEditingBanner({ titleEn: '', titleAr: '', image: '', offerPrice: 0, originalPrice: 0, offerLabelEn: '', offerLabelAr: '', promoTagEn: '', promoTagAr: '' }); setIsBannerFormOpen(true); }}
                           className="bg-red-600 text-white px-10 rounded-[2rem] py-5 font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-red-200">New Offer</button>
                       </div>
                       <div className="grid grid-cols-1 gap-6">
@@ -1011,8 +1036,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                               </div>
                             </div>
                             <div className="flex gap-4">
-                              <button onClick={() => { setEditingBanner(b); setIsBannerFormOpen(true); }} className="p-5 bg-slate-50 text-slate-300 hover:text-red-600 rounded-[1.5rem] transition-all"><Edit2 size={24} /></button>
-                              <button onClick={() => { if (confirm('Delete offer?')) { onUpdateConfig({ ...config, hero: { banners: config.hero.banners.filter(x => x.id !== b.id) } }); } }} className="p-5 bg-slate-50 text-slate-300 hover:text-slate-900 rounded-[1.5rem] transition-all"><Trash2 size={24} /></button>
+                              <button onClick={() => { pendingBannerId.current = null; setEditingBanner(b); setIsBannerFormOpen(true); }} className="p-5 bg-slate-50 text-slate-300 hover:text-red-600 rounded-[1.5rem] transition-all"><Edit2 size={24} /></button>
+                              <button onClick={() => { if (confirm('Delete offer?')) { void syncConfig({ ...config, hero: { banners: config.hero.banners.filter(x => x.id !== b.id) } }); } }} className="p-5 bg-slate-50 text-slate-300 hover:text-slate-900 rounded-[1.5rem] transition-all"><Trash2 size={24} /></button>
                             </div>
                           </div>
                         ))}
@@ -1024,9 +1049,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                       <div className={cardStyle}>
                         <h3 className="text-3xl font-black brand-font uppercase flex items-center gap-4 text-red-600 border-b pb-6"><ListOrdered size={28} /> Menu Sections</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <input className={inputStyle} placeholder="Name (EN)" value={newCat.en} onChange={e => setNewCat({ ...newCat, en: e.target.value })} />
+                          <input disabled={configBusy} className={inputStyle} placeholder="Name (EN)" value={newCat.en} onChange={e => setNewCat({ ...newCat, en: e.target.value })} />
                           <div className="flex gap-4">
-                            <input dir="rtl" className={inputStyle + " font-arabic"} placeholder="الاسم (AR)" value={newCat.ar} onChange={e => setNewCat({ ...newCat, ar: e.target.value })} />
+                            <input disabled={configBusy} dir="rtl" className={inputStyle + " font-arabic"} placeholder="الاسم (AR)" value={newCat.ar} onChange={e => setNewCat({ ...newCat, ar: e.target.value })} />
                             <button onClick={handleAddCategory} className="bg-red-600 text-white px-8 rounded-2xl shadow-xl shadow-red-200 hover:scale-105 transition-all"><Plus size={24} /></button>
                           </div>
                         </div>
@@ -1074,7 +1099,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                               className={inputStyle}
                               value={localFilterLabelEn}
                               onChange={e => setLocalFilterLabelEn(e.target.value)}
-                              onBlur={() => onUpdateConfig({ ...config, filterLabelEn: localFilterLabelEn })}
+                              onBlur={() => void syncConfig({ ...config, filterLabelEn: localFilterLabelEn })}
                             />
                           </div>
                           <div>
@@ -1084,7 +1109,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                               className={inputStyle + " font-arabic"}
                               value={localFilterLabelAr}
                               onChange={e => setLocalFilterLabelAr(e.target.value)}
-                              onBlur={() => onUpdateConfig({ ...config, filterLabelAr: localFilterLabelAr })}
+                              onBlur={() => void syncConfig({ ...config, filterLabelAr: localFilterLabelAr })}
                             />
                           </div>
                         </div>
@@ -1092,9 +1117,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                         <div className="pt-6">
                           <label className={labelStyle}>Manage Individual Tags</label>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                            <input className={inputStyle} placeholder="Tag Label (EN)" value={newTag.en} onChange={e => setNewTag({ ...newTag, en: e.target.value })} />
+                            <input disabled={configBusy} className={inputStyle} placeholder="Tag Label (EN)" value={newTag.en} onChange={e => setNewTag({ ...newTag, en: e.target.value })} />
                             <div className="flex gap-4">
-                              <input dir="rtl" className={inputStyle + " font-arabic"} placeholder="اسم الوسم (AR)" value={newTag.ar} onChange={e => setNewTag({ ...newTag, ar: e.target.value })} />
+                              <input disabled={configBusy} dir="rtl" className={inputStyle + " font-arabic"} placeholder="اسم الوسم (AR)" value={newTag.ar} onChange={e => setNewTag({ ...newTag, ar: e.target.value })} />
                               <button onClick={handleAddTag} className="bg-red-600 text-white px-8 rounded-2xl shadow-xl shadow-red-200 hover:scale-105 transition-all"><Plus size={24} /></button>
                             </div>
                           </div>
@@ -1131,16 +1156,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                       <div className={cardStyle}>
                         <h3 className="text-3xl font-black brand-font uppercase flex items-center gap-4 text-red-600 border-b pb-6"><Share2 size={28} /> Connections</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div className="relative"><Facebook className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-600" size={24} /><input className={inputStyle + " pl-16"} value={config.footer.facebook} placeholder="Facebook Link" onChange={e => syncConfig({ ...config, footer: { ...config.footer, facebook: e.target.value } })} /></div>
-                          <div className="relative"><Instagram className="absolute left-5 top-1/2 -translate-y-1/2 text-pink-600" size={24} /><input className={inputStyle + " pl-16"} value={config.footer.instagram} placeholder="Instagram Link" onChange={e => syncConfig({ ...config, footer: { ...config.footer, instagram: e.target.value } })} /></div>
-                          <div className="relative"><TikTokIcon size={24} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-900" /><input className={inputStyle + " pl-16"} value={config.footer.tiktok} placeholder="TikTok Link" onChange={e => syncConfig({ ...config, footer: { ...config.footer, tiktok: e.target.value } })} /></div>
+                          <div className="relative"><Facebook className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-600" size={24} /><input className={inputStyle + " pl-16"} value={config.footer.facebook} placeholder="Facebook Link" onChange={e => editConfig({ ...config, footer: { ...config.footer, facebook: e.target.value } })} onBlur={e => void syncConfig({ ...config, footer: { ...config.footer, facebook: e.currentTarget.value } })} /></div>
+                          <div className="relative"><Instagram className="absolute left-5 top-1/2 -translate-y-1/2 text-pink-600" size={24} /><input className={inputStyle + " pl-16"} value={config.footer.instagram} placeholder="Instagram Link" onChange={e => editConfig({ ...config, footer: { ...config.footer, instagram: e.target.value } })} onBlur={e => void syncConfig({ ...config, footer: { ...config.footer, instagram: e.currentTarget.value } })} /></div>
+                          <div className="relative"><TikTokIcon size={24} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-900" /><input className={inputStyle + " pl-16"} value={config.footer.tiktok} placeholder="TikTok Link" onChange={e => editConfig({ ...config, footer: { ...config.footer, tiktok: e.target.value } })} onBlur={e => void syncConfig({ ...config, footer: { ...config.footer, tiktok: e.currentTarget.value } })} /></div>
                           <div className="relative md:col-span-3">
                             <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-red-600" size={24} />
                             <input 
                               className={inputStyle + " pl-16"} 
                               value={config.footer.locationUrl || ''} 
                               placeholder="Google Maps Location URL" 
-                              onChange={e => syncConfig({ ...config, footer: { ...config.footer, locationUrl: e.target.value } })} 
+                              onChange={e => editConfig({ ...config, footer: { ...config.footer, locationUrl: e.target.value } })} onBlur={e => void syncConfig({ ...config, footer: { ...config.footer, locationUrl: e.currentTarget.value } })}
                             />
                           </div>
                         </div>
@@ -1239,30 +1264,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                         <div>
                           <label className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-3 block">1. Identity Information</label>
                           <div className="space-y-4">
-                            <input className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white font-black outline-none focus:border-red-600 transition-all placeholder:text-white/20" placeholder="Territory Name (EN)" value={newArea.nameEn} onChange={e => setNewArea({ ...newArea, nameEn: e.target.value })} />
-                            <input dir="rtl" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white font-black font-arabic outline-none focus:border-red-600 transition-all placeholder:text-white/20" placeholder="اسم المنطقة (AR)" value={newArea.nameAr} onChange={e => setNewArea({ ...newArea, nameAr: e.target.value })} />
+                            <input disabled={configBusy} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white font-black outline-none focus:border-red-600 transition-all placeholder:text-white/20" placeholder="Territory Name (EN)" value={newArea.nameEn} onChange={e => setNewArea({ ...newArea, nameEn: e.target.value })} />
+                            <input disabled={configBusy} dir="rtl" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white font-black font-arabic outline-none focus:border-red-600 transition-all placeholder:text-white/20" placeholder="اسم المنطقة (AR)" value={newArea.nameAr} onChange={e => setNewArea({ ...newArea, nameAr: e.target.value })} />
                           </div>
                         </div>
                         <div>
                           <label className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-3 block">2. Pricing Rules</label>
                           <div className="relative">
                             <div className="absolute left-5 top-1/2 -translate-y-1/2 text-white/30 font-black text-xs">LE</div>
-                            <input type="number" className="w-full bg-white/5 border border-white/10 p-4 pl-12 rounded-2xl text-white font-black outline-none focus:border-red-600 transition-all placeholder:text-white/20" placeholder="Flat Delivery Fee" value={newArea.fee || ''} onChange={e => setNewArea({ ...newArea, fee: Number(e.target.value) })} />
+                            <input disabled={configBusy} type="number" className="w-full bg-white/5 border border-white/10 p-4 pl-12 rounded-2xl text-white font-black outline-none focus:border-red-600 transition-all placeholder:text-white/20" placeholder="Flat Delivery Fee" value={newArea.fee || ''} onChange={e => setNewArea({ ...newArea, fee: Number(e.target.value) })} />
                           </div>
                         </div>
                         <div className="pt-4 border-t border-white/10 space-y-4">
                           <p className="text-[9px] font-black text-white/40 uppercase text-center italic tracking-widest">Click 3 or more points on the map to define boundaries</p>
                           <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => { setDrawingMode(false); setCurrentPolygonPoints([]); ghostLayerRef.current?.clearLayers(); }}
+                            <button disabled={configBusy} onClick={() => { setDrawingMode(false); setCurrentPolygonPoints([]); ghostLayerRef.current?.clearLayers(); }}
                               className="bg-white/5 text-white/60 font-black py-4 rounded-2xl hover:bg-white/10 transition-all uppercase text-[10px] tracking-widest">Discard</button>
-                            <button disabled={currentPolygonPoints.length < 3 || !newArea.nameEn || !newArea.nameAr}
-                              onClick={() => { 
-                                syncConfig({ 
+                            <button disabled={configSaveStatus === 'saving' || currentPolygonPoints.length < 3 || !newArea.nameEn || !newArea.nameAr}
+                              onClick={async () => {
+                                if (configSaver.current!.isSaving()) return;
+                                const id = pendingAreaId.current || 'a' + Date.now();
+                                pendingAreaId.current = id;
+                                if (!await syncConfig({
                                   ...config, 
-                                  areas: [...(config.areas || []), { id: 'a' + Date.now(), ...newArea, points: currentPolygonPoints } as Area] 
-                                }); 
+                                  areas: upsertConfigEntry(config.areas, { ...newArea, id, points: currentPolygonPoints } as Area)
+                                })) return;
                                 setDrawingMode(false); 
                                 setCurrentPolygonPoints([]); 
+                                pendingAreaId.current = null;
                                 setNewArea({ nameEn: '', nameAr: '', fee: 0 }); // Reset form
                                 refreshExistingZones(); 
                               }}
@@ -1291,7 +1320,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                         <span className="text-sm font-black text-slate-900 uppercase leading-none mb-1">Point Capturing Mode</span>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mark territory on the satellite grid</span>
                       </div>
-                      <button onClick={() => setCurrentPolygonPoints(prev => prev.slice(0, -1))} className="p-3 bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-600 rounded-2xl transition-all">
+                      <button disabled={configBusy} onClick={() => { if (!configSaver.current!.isSaving()) setCurrentPolygonPoints(prev => prev.slice(0, -1)); }} className="p-3 bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-600 rounded-2xl transition-all">
                         <RotateCcw size={20} />
                       </button>
                     </div>
@@ -1302,7 +1331,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                       <button onClick={() => adminMapRef.current?.setView([30.0444, 31.2357], 11)} className="bg-white p-4 rounded-2xl shadow-2xl text-slate-900 hover:text-red-600 transition-all active:scale-90 border border-slate-100">
                         <MapPin size={28} />
                       </button>
-                      <button onClick={() => setDrawingMode(true)} className="bg-red-600 text-white p-4 rounded-2xl shadow-2xl hover:bg-slate-900 transition-all active:scale-90 shadow-red-200">
+                      <button disabled={configBusy} onClick={() => { if (!configSaver.current!.isSaving()) setDrawingMode(true); }} className="bg-red-600 text-white p-4 rounded-2xl shadow-2xl hover:bg-slate-900 transition-all active:scale-90 shadow-red-200">
                         <Plus size={28} strokeWidth={4} />
                       </button>
                     </div>
@@ -1489,9 +1518,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
 
         {isBannerFormOpen && editingBanner && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center p-6">
-            <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-xl" onClick={() => setIsBannerFormOpen(false)} />
+            <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-xl" onClick={() => { if (!configSaver.current!.isSaving()) setIsBannerFormOpen(false); }} />
             <form onSubmit={handleSaveBanner} className="relative bg-white w-full max-w-4xl rounded-[4rem] p-12 shadow-2xl animate-scale-up space-y-10 border-[12px] border-white overflow-y-auto max-h-[90vh] no-scrollbar">
-              <div className="flex justify-between items-center mb-4 py-6 border-b-4 border-slate-50"><h3 className="text-4xl font-black brand-font text-slate-900 uppercase leading-none">Slider Offer Setup</h3><button type="button" onClick={() => setIsBannerFormOpen(false)} className="text-slate-300 hover:text-red-600 transition-all"><X size={48} /></button></div>
+              <fieldset disabled={configBusy || loading} className="contents space-y-10">
+              <div className="flex justify-between items-center mb-4 py-6 border-b-4 border-slate-50"><h3 className="text-4xl font-black brand-font text-slate-900 uppercase leading-none">Slider Offer Setup</h3><button type="button" onClick={() => { if (!configSaver.current!.isSaving()) setIsBannerFormOpen(false); }} className="text-slate-300 hover:text-red-600 transition-all"><X size={48} /></button></div>
               <div className="space-y-4"><label className={labelStyle}>Banner Image (PNG Preferred)</label><div onClick={() => bannerFileInputRef.current?.click()} className="relative w-full h-72 border-4 border-dashed rounded-[3rem] flex flex-col items-center justify-center cursor-pointer bg-slate-50 overflow-hidden hover:border-red-600 shadow-inner group">{editingBanner.image ? <img src={editingBanner.image} className="h-full object-contain p-10 group-hover:scale-105 transition-transform" /> : <Upload size={64} className="text-slate-200" />}<input type="file" ref={bannerFileInputRef} className="hidden" accept="image/*" onChange={(e) => e.target.files && handleFile(e.target.files[0], 'banner')} /></div></div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-6">
                 <div className="space-y-6">
@@ -1521,6 +1551,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                 </div>
               </div>
               <button type="submit" className="w-full py-10 font-black uppercase text-2xl tracking-[0.4em] bg-slate-900 text-white rounded-[3rem] shadow-2xl hover:bg-red-600 transition-all flex items-center justify-center gap-8 active:scale-95"><Sparkles size={32} /> DEPLOY CAMPAIGN</button>
+              </fieldset>
             </form>
           </div>
         )}
