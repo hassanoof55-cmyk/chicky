@@ -1,3 +1,4 @@
+import { mapStoredOrder } from '../lib/orderDetails';
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -90,18 +91,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        const mappedOrders = data?.map(o => ({
-          id: o.id,
-          customerName: o.customer_name,
-          phone: o.phone,
-          address: o.address,
-          area: o.area,
-          location: o.location,
-          items: o.items,
-          totalPrice: o.total_price,
-          status: o.status,
-          createdAt: o.created_at
-        }));
+        const mappedOrders = data.map(mapStoredOrder);
         setOrders(mappedOrders);
       }
     };
@@ -120,18 +110,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
       .channel('realtime_admin')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
         const newOrder = payload.new;
-        const mapped = {
-          id: newOrder.id,
-          customerName: newOrder.customer_name,
-          phone: newOrder.phone,
-          address: newOrder.address,
-          area: newOrder.area,
-          location: newOrder.location,
-          items: newOrder.items,
-          totalPrice: newOrder.total_price,
-          status: newOrder.status,
-          createdAt: newOrder.created_at
-        };
+        const mapped = mapStoredOrder(newOrder);
         setOrders(prev => [mapped, ...prev]);
 
         // Sound Notification
@@ -730,12 +709,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                             <h5 className="text-[11px] font-black text-slate-300 uppercase tracking-[0.3em] flex items-center gap-3">
                               <Layout size={14} className="text-red-600" /> Order Summary
                             </h5>
+                            <div className="text-sm font-bold text-slate-600">
+                              {order.serviceType}{order.scheduledTime && ` · Scheduled: ${order.scheduledTime}`}
+                            </div>
                             <div className="bg-slate-50 rounded-3xl p-6 space-y-4">
                               {order.items?.map((item, idx) => (
                                 <div key={idx} className="flex justify-between items-center text-sm">
                                   <div className="flex items-center gap-3">
                                     <span className="w-7 h-7 bg-white rounded-lg flex items-center justify-center font-black text-[10px] border border-slate-100">{item.quantity}x</span>
                                     <span className="font-bold text-slate-900">{item.name}</span>
+                                    {item.selectedSize && <span className="text-xs text-slate-500">{item.selectedSize.nameEn || item.selectedSize.nameAr}</span>}
+                                    {item.selectedModifiers?.map(modifier => <span key={modifier.id} className="text-xs text-slate-500">+ {modifier.nameEn || modifier.nameAr}</span>)}
                                     {item.selectedSpiciness && (
                                       <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase border ${item.selectedSpiciness === 'Spicy' ? 'border-red-200 text-red-600 bg-red-50' : 'border-slate-200 text-slate-400 bg-white'}`}>
                                         {item.selectedSpiciness}
