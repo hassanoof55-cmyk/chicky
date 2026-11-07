@@ -1,6 +1,6 @@
 import { createAdminConfigSaver, ConfigSaveStatus, upsertConfigEntry } from '../lib/adminConfig';
 import { disposeLeafletMap } from '../lib/leafletCleanup';
-import { mapStoredOrder } from '../lib/orderDetails';
+import { fetchOrdersPage, fetchOrderStats, exportOrdersCsv, orderDateRange, ORDER_PAGE_SIZE, EMPTY_ORDER_STATS, type AdminOrderStats } from '../lib/adminOrders';
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -34,14 +34,6 @@ interface AdminDashboardProps {
   onUpdateConfig: (newConfig: SiteConfig) => void;
 }
 
-interface AdminOrderStats {
-  totalOrders: number;
-  totalRevenue: number;
-  areaStats: Record<string, { count: number; revenue: number }>;
-  topArea: [string, { count: number; revenue: number }] | undefined;
-  topItem: [string, number] | undefined;
-}
-
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSignOut, menu, onUpdateMenu, config: persistedConfig, onUpdateConfig }) => {
   const [config, setDraftConfig] = useState(persistedConfig);
   const [configSaveStatus, setConfigSaveStatus] = useState<ConfigSaveStatus | 'dirty' | null>(null);
@@ -68,6 +60,57 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [ordersPage, setOrdersPage] = useState(0);
+  const [ordersRefresh, setOrdersRefresh] = useState(0);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState('');
+  const [pageResult, setPageResult] = useState<{ key: string; total: number } | null>(null);
+  const [statsResult, setStatsResult] = useState<{ key: string; stats: AdminOrderStats } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const exportController = useRef<AbortController | null>(null);
+  const periodValue = filterType === 'day' ? selectedDate : filterType === 'month' ? selectedMonth : selectedYear;
+  const pageKey = `${ordersPage}:${ordersRefresh}`;
+  const statsKey = `${filterType}:${periodValue}:${ordersRefresh}`;
+  const ordersReady = pageResult?.key === pageKey && !ordersLoading && !ordersError;
+  const statsReady = statsResult?.key === statsKey && !statsLoading && !statsError;
+  const stats: AdminOrderStats = statsResult?.stats ?? EMPTY_ORDER_STATS;
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'orders') return;
+    let active = true;
+    const controller = new AbortController();
+    setOrdersLoading(true); setOrdersError('');
+    void fetchOrdersPage(supabase, ordersPage, controller.signal).then(result => {
+      if (!active) return;
+      const lastPage = Math.max(0, Math.ceil(result.total / ORDER_PAGE_SIZE) - 1);
+      if (ordersPage > lastPage) { setOrdersPage(lastPage); return; }
+      setOrders(result.orders); setPageResult({ key: pageKey, total: result.total });
+    }).catch(() => {
+      if (active) setOrdersError('تعذر تحميل صفحة الطلبات. حاول مرة أخرى.');
+    }).finally(() => { if (active) setOrdersLoading(false); });
+    return () => { active = false; controller.abort(); };
+  }, [isOpen, activeTab, pageKey]);
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'orders') return;
+    let active = true;
+    const controller = new AbortController();
+    setStatsLoading(true); setStatsError('');
+    void (async () => {
+      try {
+        const range = orderDateRange(filterType, periodValue);
+        const result = await fetchOrderStats(supabase, range, controller.signal);
+        if (active) setStatsResult({ key: statsKey, stats: result });
+      } catch {
+        if (active) setStatsError('تعذر تحميل إحصائيات الفترة. تأكد من التاريخ وحاول مرة أخرى.');
+      } finally { if (active) setStatsLoading(false); }
+    })();
+    return () => { active = false; controller.abort(); };
+  }, [isOpen, activeTab, statsKey]);
+  useEffect(() => () => exportController.current?.abort(), []);
+
 
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -105,24 +148,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
     orderAlert.volume = 1;
     orderAlert.preload = 'auto';
 
-    // 1. Fetch Initial Orders from Supabase
-    const fetchOrders = async () => {
-      try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      if (data) {
-        const mappedOrders = data.map(mapStoredOrder);
-        setOrders(mappedOrders);
-      }
-      } catch { setActionError('تعذر تحميل الطلبات. أعد فتح القسم أو راجع الاتصال.'); }
-    };
-
-    fetchOrders();
-
     // 3. Fetch Promo Codes
     const fetchPromoCodes = async () => {
       try {
@@ -136,14 +161,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
     // 2. Real-time Subscription
     const channel = supabase
       .channel('realtime_admin')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
-        const newOrder = payload.new;
-        const mapped = mapStoredOrder(newOrder);
-        setOrders(prev => [mapped, ...prev]);
-
-        // Sound Notification
-        orderAlert.currentTime = 0;
-        orderAlert.play().catch(() => { });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, payload => {
+        // Refresh bounded pages and independent totals instead of growing a local list.
+        setOrdersRefresh(value => value + 1);
+        if (payload.eventType === 'INSERT') {
+          orderAlert.currentTime = 0;
+          orderAlert.play().catch(() => { });
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'promo_codes' }, () => {
         fetchPromoCodes();
@@ -156,42 +180,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
       supabase.removeChannel(channel);
     };
   }, [isOpen]);
-
-  const stats: AdminOrderStats = React.useMemo(() => {
-    const filteredOrders = orders.filter(o => {
-      if (!o.createdAt) return false;
-      const matchesDate = filterType === 'day' ? o.createdAt.startsWith(selectedDate) : 
-                         filterType === 'month' ? o.createdAt.startsWith(selectedMonth) :
-                         o.createdAt.startsWith(selectedYear);
-      const isNotCancelled = o.status !== 'cancelled';
-      return matchesDate && isNotCancelled;
-    });
-    
-    const totalOrders = filteredOrders.length;
-    const totalRevenue = filteredOrders.reduce((acc, o) => acc + o.totalPrice, 0);
-    
-    const areaStats: Record<string, { count: number; revenue: number }> = {};
-    const itemStats: Record<string, number> = {};
-
-    filteredOrders.forEach(order => {
-      // Area Stats
-      const area = order.area || 'Unknown';
-      if (!areaStats[area]) areaStats[area] = { count: 0, revenue: 0 };
-      areaStats[area].count += 1;
-      areaStats[area].revenue += order.totalPrice;
-
-      // Item Stats
-      order.items?.forEach(item => {
-        itemStats[item.name] = (itemStats[item.name] || 0) + item.quantity;
-      });
-    });
-
-    const topArea = Object.entries(areaStats).sort((a, b) => b[1].count - a[1].count)[0];
-    const topItem = Object.entries(itemStats).sort((a, b) => b[1] - a[1])[0];
-
-    return { totalOrders, totalRevenue, areaStats, topArea, topItem };
-  }, [orders, selectedMonth, selectedDate, selectedYear, filterType]);
-
 
   const adminMapRef = useRef<any>(null);
   const drawingLayerRef = useRef<any>(null);
@@ -513,7 +501,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                 <div className="flex items-center justify-between bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm">
                   <div>
                     <h3 className="text-3xl font-black brand-font uppercase text-slate-900">Order Analytics</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Viewing {filterType === 'day' ? 'Daily' : 'Monthly'} statistics</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Viewing {filterType === 'day' ? 'Daily' : filterType === 'month' ? 'Monthly' : 'Yearly'} statistics · history includes all dates</p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex bg-slate-100 p-1.5 rounded-xl">
@@ -547,62 +535,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                       </select>
                     )}
                     <button 
-                      onClick={() => {
-                        const filtered = orders.filter(o => {
-                          if (!o.createdAt) return false;
-                          if (filterType === 'day') return o.createdAt.startsWith(selectedDate);
-                          if (filterType === 'month') return o.createdAt.startsWith(selectedMonth);
-                          return o.createdAt.startsWith(selectedYear);
-                        }).filter(o => o.status !== 'cancelled');
-
-                        const headers = ["Order ID", "Date", "Customer", "Phone", "Area", "Total Price", "Status", "Items"];
-                        
-                        // Create CSV content with UTF-8 BOM for Arabic support
-                        const csvRows = [
-                          headers.join(','),
-                          ...filtered?.map(o => {
-                            const statusLabel = o.status === 'pending' ? 'قيد التنفيذ' : o.status === 'completed' ? 'تم التوصيل' : 'ملغي';
-                            const itemsList = o.items?.map(i => `${i.name} (x${i.quantity})`).join(' | ') || '';
-                            
-                            // Escape commas and quotes for CSV
-                            return [
-                              `"${o.id.slice(-6)}"`,
-                              `"${new Date(o.createdAt).toLocaleString('ar-EG')}"`,
-                              `"${o.customerName.replace(/"/g, '""')}"`,
-                              `"${o.phone}"`,
-                              `"${(o.area || 'N/A').replace(/"/g, '""')}"`,
-                              o.totalPrice,
-                              `"${statusLabel}"`,
-                              `"${itemsList.replace(/"/g, '""')}"`
-                            ].join(',');
-                          })
-                        ];
-
-                        const csvString = '\uFEFF' + csvRows.join('\n'); // Add BOM for Excel UTF-8 support
-
-                        const getDayName = (dateStr: string) => {
-                          return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date(dateStr));
-                        };
-
-                        const fileName = filterType === 'day' 
-                          ? `Chicky_Report_${selectedDate}_${getDayName(selectedDate)}` 
-                          : filterType === 'month' 
-                          ? `Chicky_Report_${selectedMonth}` 
-                          : `Chicky_Report_${selectedYear}`;
-
-                        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-                        const link = document.createElement("a");
-                        link.href = URL.createObjectURL(blob);
-                        link.download = `${fileName}.csv`;
-                        link.click();
+                      disabled={exporting || !statsReady}
+                      onClick={async () => {
+                        if (exportController.current) return;
+                        const controller = new AbortController();
+                        exportController.current = controller; setExporting(true); setActionError('');
+                        try {
+                          const range = orderDateRange(filterType, periodValue);
+                          const csvString = await exportOrdersCsv(supabase, range, controller.signal);
+                          const dayName = filterType === 'day' ? new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(selectedDate)) : '';
+                          const fileName = `Chicky_Report_${periodValue}${dayName ? '_' + dayName : ''}`;
+                          const url = URL.createObjectURL(new Blob([csvString], { type: 'text/csv;charset=utf-8;' }));
+                          const link = document.createElement('a');
+                          link.href = url; link.download = `${fileName}.csv`; link.click();
+                          setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        } catch {
+                          if (!controller.signal.aborted) setActionError('تعذر إكمال التصدير. لم يتم تنزيل ملف جزئي؛ حاول مرة أخرى.');
+                        } finally { exportController.current = null; setExporting(false); }
                       }}
                       className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-200 hover:scale-105 transition-all flex items-center gap-3"
                     >
-                      <FileSpreadsheet size={16} /> Export Report
+                      <FileSpreadsheet size={16} /> {exporting ? 'Exporting…' : 'Export Report'}
                     </button>
                   </div>
                 </div>
 
+                {!statsReady ? <div role={statsError ? 'alert' : 'status'} className="p-8 bg-white rounded-3xl text-slate-600">
+                  {statsError || 'جاري تحميل إحصائيات كل طلبات الفترة…'}
+                  {statsError && <button className="mr-4 underline" onClick={() => setOrdersRefresh(value => value + 1)}>إعادة المحاولة</button>}
+                </div> : <>
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                    <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
@@ -649,12 +610,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                    </div>
                 </div>
 
+                </>}
+
                 <div className="pt-10 border-t border-slate-100">
-                   <h3 className="text-2xl font-black brand-font uppercase text-slate-900 mb-8">Recent Orders History</h3>
+                   <h3 className="text-2xl font-black brand-font uppercase text-slate-900 mb-4">Recent Orders History</h3>
+                   <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+                     <p className="text-sm text-slate-500">All dates and statuses · {ordersReady ? pageResult!.total : '…'} orders</p>
+                     <div className="flex items-center gap-4">
+                       <button className="px-4 py-2 rounded-xl bg-white border disabled:opacity-40" disabled={ordersPage === 0 || ordersLoading} onClick={() => setOrdersPage(value => Math.max(0, value - 1))}>Previous</button>
+                       <span>Page {ordersPage + 1} / {pageResult ? Math.max(1, Math.ceil(pageResult.total / ORDER_PAGE_SIZE)) : '…'}</span>
+                       <button className="px-4 py-2 rounded-xl bg-white border disabled:opacity-40" disabled={!ordersReady || (ordersPage + 1) * ORDER_PAGE_SIZE >= (pageResult?.total || 0)} onClick={() => setOrdersPage(value => value + 1)}>Next</button>
+                     </div>
+                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
-                  {orders?.length === 0 ? (
+                  {!ordersReady ? <div role={ordersError ? 'alert' : 'status'} className="p-8 bg-white rounded-3xl text-slate-600">
+                    {ordersError || 'جاري تحميل صفحة الطلبات…'}
+                    {ordersError && <button className="mr-4 underline" onClick={() => setOrdersRefresh(value => value + 1)}>إعادة المحاولة</button>}
+                  </div> : orders.length === 0 ? (
                     <div className="bg-white p-20 rounded-[3.5rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-slate-300 italic">
                       No orders recorded yet.
                     </div>
@@ -752,6 +726,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                             const { error } = await supabase.from('orders').update({ status: 'completed' }).eq('id', order.id);
                             if (error) throw error;
                             if (!error) {
+                              setOrdersRefresh(value => value + 1);
                               setOrders(prev => prev?.map(o => o.id === order.id ? { ...o, status: 'completed' as const } : o));
                             }
                             } catch { setActionError('تعذر تغيير حالة الطلب. حاول مرة أخرى.'); }
@@ -763,6 +738,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                             const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id);
                             if (error) throw error;
                             if (!error) {
+                              setOrdersRefresh(value => value + 1);
                               setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'cancelled' as const } : o));
                             }
                             } catch { setActionError('تعذر تغيير حالة الطلب. حاول مرة أخرى.'); }
@@ -1587,6 +1563,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
             }
           `}} />
 
+          {!statsReady ? <p>إحصائيات الفترة غير متاحة بعد. افتح قسم الطلبات وانتظر اكتمال التحميل ثم اطبع.</p> : <>
           {/* Report Header */}
           <div className="flex justify-between items-center border-b-4 border-slate-900 pb-6 mb-8">
             <div className="flex items-center gap-4">
@@ -1605,7 +1582,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
           <div className="mb-8">
              <div className="bg-slate-50 p-6 rounded-2xl border-l-8 border-red-600 mb-8">
                 <h2 className="text-2xl font-black uppercase mb-1">
-                  {filterType === 'day' ? `Daily Summary: ${selectedDate}` : `Monthly Analysis: ${selectedMonth}`}
+                  {filterType === 'day' ? `Daily Summary: ${selectedDate}` : filterType === 'month' ? `Monthly Analysis: ${selectedMonth}` : `Yearly Analysis: ${selectedYear}`}
                 </h2>
                 <p className="text-xs text-slate-500 font-medium italic">This report provides a detailed breakdown of sales and customer activity.</p>
              </div>
@@ -1681,6 +1658,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Chicky Restaurant Management System • Confidential Report</p>
              <p className="text-[9px] font-bold text-slate-400">Page 1 of 1</p>
           </div>
+          </>}
         </div>
       </div>
     </div>
