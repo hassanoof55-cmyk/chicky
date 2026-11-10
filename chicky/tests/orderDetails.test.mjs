@@ -28,3 +28,10 @@ test('legacy admin order labels remain readable without rewriting saved records'
   assert.deepEqual(saved.items[0].selectedModifiers,[]);
   assert.equal(saved.scheduledTime,undefined);
 });
+test('admin mapping retains server pricing snapshots without creating amounts for historical orders', () => {
+  const pricing = { version:1,subtotal:200,delivery_fee:30,discount_amount:20 };
+  const saved = mapStoredOrder({items:[],total_price:210,order_details:{pricing}});
+  assert.deepEqual(saved.pricing, pricing);
+  assert.equal(saved.totalPrice, 210);
+  assert.equal(mapStoredOrder({items:[]}).pricing, undefined);
+});
