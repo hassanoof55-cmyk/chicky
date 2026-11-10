@@ -10,9 +10,36 @@ export interface AdminOrderStats {
 }
 export const ORDER_PAGE_SIZE = 25;
 export const EMPTY_ORDER_STATS: AdminOrderStats = { totalOrders: 0, totalRevenue: 0, areaStats: {} };
-const ORDER_COLUMNS = 'id,customer_name,phone,address,area,location,items,total_price,status,created_at,order_details';
+const ORDER_COLUMNS = 'id,customer_name,phone,address,area,location,items,total_price,status,created_at,order_details,payment_method';
 const EXPORT_COLUMNS = 'id,created_at,customer_name,phone,area,total_price,status,items';
 export type OrderRange = { from: string; until: string };
+export interface OrderFilters {
+  search: string;
+  status: '' | StoredOrder['status'];
+  area: string;
+  from: string;
+  until: string;
+}
+export const EMPTY_ORDER_FILTERS: OrderFilters = { search: '', status: '', area: '', from: '', until: '' };
+
+// Keep user text out of PostgREST's filter grammar (commas, wildcards and operators).
+export function orderSearchText(value: string): string {
+  return value.normalize('NFKC').replace(/[٠-٩۰-۹]/g, c => String(c.charCodeAt(0) - (c <= '٩' ? 1632 : 1776)))
+    .replace(/[^\p{L}\p{N}\s+\-]/gu, ' ').trim().replace(/\s+/g, ' ').slice(0, 100);
+}
+
+export function cairoDateBoundary(value: string, nextDay = false): string {
+  const range = orderDateRange('day', value);
+  const wall = Date.parse(nextDay ? range.until : range.from);
+  const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+  let utc = wall;
+  for (let i = 0; i < 3; i++) {
+    const parts = Object.fromEntries(formatter.formatToParts(new Date(utc)).map(part => [part.type, part.value]));
+    const local = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+    utc += wall - local;
+  }
+  return new Date(utc).toISOString();
+}
 
 // Preserve the UTC date-prefix semantics used by the original reports.
 export function orderDateRange(kind: 'day' | 'month' | 'year', value: string): OrderRange {
@@ -28,9 +55,24 @@ export function orderDateRange(kind: 'day' | 'month' | 'year', value: string): O
   return { from: start.toISOString(), until: end.toISOString() };
 }
 
-export async function fetchOrdersPage(client: any, page: number, signal?: AbortSignal): Promise<{ orders: StoredOrder[]; total: number }> {
+export async function fetchOrdersPage(client: any, page: number, signal?: AbortSignal, filters: OrderFilters = EMPTY_ORDER_FILTERS): Promise<{ orders: StoredOrder[]; total: number }> {
   if (!Number.isSafeInteger(page) || page < 0) throw new Error('Invalid page');
-  let query = client.from('orders').select(ORDER_COLUMNS, { count: 'exact' })
+  if (filters.status && !['pending', 'completed', 'cancelled'].includes(filters.status)) throw new Error('Invalid status');
+  if (filters.from && filters.until && filters.from > filters.until) throw new Error('Invalid date range');
+  let query = client.from('orders').select(ORDER_COLUMNS, { count: 'exact' });
+  const search = orderSearchText(filters.search);
+  const area = orderSearchText(filters.area);
+  if (filters.search.trim() && !search) throw new Error('Enter a name, phone or order number');
+  if (filters.area.trim() && !area) throw new Error('Enter an area name');
+  if (search) {
+    const idSearch = search.replace(/^CH-/i, '') || search;
+    query = query.or(`id.ilike.%${idSearch}%,customer_name.ilike.%${search}%,phone.ilike.%${search}%`);
+  }
+  if (filters.status) query = query.eq('status', filters.status);
+  if (area) query = query.ilike('area', `%${area}%`);
+  if (filters.from) query = query.gte('created_at', cairoDateBoundary(filters.from));
+  if (filters.until) query = query.lt('created_at', cairoDateBoundary(filters.until, true));
+  query = query
     .order('created_at', { ascending: false }).order('id', { ascending: false })
     .range(page * ORDER_PAGE_SIZE, (page + 1) * ORDER_PAGE_SIZE - 1);
   if (signal) query = query.abortSignal(signal);

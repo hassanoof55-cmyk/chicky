@@ -1,6 +1,8 @@
 import { createAdminConfigSaver, ConfigSaveStatus, upsertConfigEntry } from '../lib/adminConfig';
 import { disposeLeafletMap } from '../lib/leafletCleanup';
-import { fetchOrdersPage, fetchOrderStats, exportOrdersCsv, orderDateRange, ORDER_PAGE_SIZE, EMPTY_ORDER_STATS, type AdminOrderStats } from '../lib/adminOrders';
+import { fetchOrdersPage, fetchOrderStats, exportOrdersCsv, orderDateRange, ORDER_PAGE_SIZE, EMPTY_ORDER_STATS, EMPTY_ORDER_FILTERS, type OrderFilters, type AdminOrderStats } from '../lib/adminOrders';
+import AdminOrderCard from './AdminOrderCard';
+import './adminOrders.css';
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -51,7 +53,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
   const editConfig = (next: SiteConfig) => {
     configSaver.current!.stage(next);
   };
-  const [activeTab, setActiveTab] = useState<'menu' | 'builder' | 'areas' | 'orders' | 'marketing'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'builder' | 'areas' | 'orders' | 'marketing'>('orders');
+  const [ordersView, setOrdersView] = useState<'tracking' | 'reports'>('tracking');
+  const [filterDraft, setFilterDraft] = useState<OrderFilters>(EMPTY_ORDER_FILTERS);
+  const [orderFilters, setOrderFilters] = useState<OrderFilters>(EMPTY_ORDER_FILTERS);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const ordersScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (activeTab === 'orders' && ordersScrollRef.current) ordersScrollRef.current.scrollTop = 0; }, [activeTab, ordersView]);
   const [builderSubTab, setBuilderSubTab] = useState<'branding' | 'hero' | 'categories' | 'tags' | 'social'>('branding');
   const [orders, setOrders] = useState<StoredOrder[]>([]);
   const [promoCodes, setPromoCodes] = useState<any[]>([]);
@@ -71,18 +79,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
   const [exporting, setExporting] = useState(false);
   const exportController = useRef<AbortController | null>(null);
   const periodValue = filterType === 'day' ? selectedDate : filterType === 'month' ? selectedMonth : selectedYear;
-  const pageKey = `${ordersPage}:${ordersRefresh}`;
+  const pageKey = `${ordersPage}:${ordersRefresh}:${JSON.stringify(orderFilters)}`;
   const statsKey = `${filterType}:${periodValue}:${ordersRefresh}`;
   const ordersReady = pageResult?.key === pageKey && !ordersLoading && !ordersError;
   const statsReady = statsResult?.key === statsKey && !statsLoading && !statsError;
   const stats: AdminOrderStats = statsResult?.stats ?? EMPTY_ORDER_STATS;
 
   useEffect(() => {
-    if (!isOpen || activeTab !== 'orders') return;
+    if (!isOpen || activeTab !== 'orders' || ordersView !== 'tracking') return;
     let active = true;
     const controller = new AbortController();
     setOrdersLoading(true); setOrdersError('');
-    void fetchOrdersPage(supabase, ordersPage, controller.signal).then(result => {
+    void fetchOrdersPage(supabase, ordersPage, controller.signal, orderFilters).then(result => {
       if (!active) return;
       const lastPage = Math.max(0, Math.ceil(result.total / ORDER_PAGE_SIZE) - 1);
       if (ordersPage > lastPage) { setOrdersPage(lastPage); return; }
@@ -91,10 +99,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
       if (active) setOrdersError('تعذر تحميل صفحة الطلبات. حاول مرة أخرى.');
     }).finally(() => { if (active) setOrdersLoading(false); });
     return () => { active = false; controller.abort(); };
-  }, [isOpen, activeTab, pageKey]);
+  }, [isOpen, activeTab, ordersView, pageKey]);
 
   useEffect(() => {
-    if (!isOpen || activeTab !== 'orders') return;
+    if (!isOpen || activeTab !== 'orders' || ordersView !== 'reports') return;
     let active = true;
     const controller = new AbortController();
     setStatsLoading(true); setStatsError('');
@@ -108,8 +116,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
       } finally { if (active) setStatsLoading(false); }
     })();
     return () => { active = false; controller.abort(); };
-  }, [isOpen, activeTab, statsKey]);
+  }, [isOpen, activeTab, ordersView, statsKey]);
   useEffect(() => () => exportController.current?.abort(), []);
+
+  const updateOrderStatus = async (id: string, status: StoredOrder['status']) => {
+    setActionError('');
+    try {
+      const { error } = await supabase.from('orders').update({ status }).eq('id', id);
+      if (error) throw error;
+      setOrdersRefresh(value => value + 1);
+      setOrders(previous => previous.map(order => order.id === id ? { ...order, status } : order));
+    } catch { setActionError('تعذر تغيير حالة الطلب. حاول مرة أخرى.'); }
+  };
 
 
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
@@ -458,30 +476,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm no-print" onClick={requestClose} />
       <div className="relative bg-slate-50 w-full h-full md:h-[95vh] md:rounded-[4rem] shadow-2xl flex flex-col overflow-hidden border-[12px] border-white no-print">
 
-        <div className="w-full bg-slate-50 border-b-2 border-slate-100 flex items-center justify-between px-10 py-6 shrink-0">
+        <div className="admin-dashboard-header w-full bg-slate-50 border-b-2 border-slate-100 flex flex-wrap gap-3 items-center justify-between px-4 md:px-8 py-4 shrink-0">
           <div className="flex items-center gap-6">
             <div className="bg-red-600 p-3 rounded-2xl shadow-xl shadow-red-100 text-white">
               <Database size={24} />
             </div>
             <div>
               <h2 className="text-2xl font-black brand-font text-red-600 tracking-tighter uppercase leading-none">DASHBOARD</h2>
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] mt-1">ADMIN V10.2 • TOP-BAR NAV</p>
+              <p className="hidden md:block text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] mt-1">ADMIN V10.2 • TOP-BAR NAV</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-slate-200/50 p-1.5 rounded-[2rem]">
-            <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'orders' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><ListOrdered size={16} /> ORDERS</button>
-            <button onClick={() => setActiveTab('marketing')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'marketing' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><TagIcon size={16} /> MARKETING</button>
-            <button onClick={() => setActiveTab('areas')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'areas' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Truck size={16} /> LOGISTICS</button>
-            <button onClick={() => setActiveTab('builder')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'builder' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Settings2 size={16} /> BUILDER</button>
-            <button onClick={() => setActiveTab('menu')} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest transition-all ${activeTab === 'menu' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Database size={16} /> MENU</button>
+          <div className="admin-dashboard-nav flex items-center gap-1 bg-slate-200/50 p-1 rounded-2xl overflow-x-auto max-w-full">
+            <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-2 px-3 md:px-5 py-3 rounded-xl text-[10px] font-black tracking-widest transition-all ${activeTab === 'orders' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><ListOrdered size={16} /> ORDERS</button>
+            <button onClick={() => setActiveTab('marketing')} className={`flex items-center gap-2 px-3 md:px-5 py-3 rounded-xl text-[10px] font-black tracking-widest transition-all ${activeTab === 'marketing' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><TagIcon size={16} /> MARKETING</button>
+            <button onClick={() => setActiveTab('areas')} className={`flex items-center gap-2 px-3 md:px-5 py-3 rounded-xl text-[10px] font-black tracking-widest transition-all ${activeTab === 'areas' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Truck size={16} /> LOGISTICS</button>
+            <button onClick={() => setActiveTab('builder')} className={`flex items-center gap-2 px-3 md:px-5 py-3 rounded-xl text-[10px] font-black tracking-widest transition-all ${activeTab === 'builder' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Settings2 size={16} /> BUILDER</button>
+            <button onClick={() => setActiveTab('menu')} className={`flex items-center gap-2 px-3 md:px-5 py-3 rounded-xl text-[10px] font-black tracking-widest transition-all ${activeTab === 'menu' ? 'bg-white text-red-600 shadow-xl' : 'text-slate-500 hover:bg-white'}`}><Database size={16} /> MENU</button>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="admin-dashboard-actions flex items-center gap-2 md:gap-4">
             <button onClick={requestSignOut} className="px-4 py-3 text-red-600 font-bold rounded-xl hover:bg-red-50">تسجيل الخروج</button>
-            <button onClick={requestClose} className="flex items-center gap-3 px-6 py-4 bg-red-50 text-red-600 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm group">
+            <button onClick={requestClose} className="hidden md:flex items-center gap-3 px-6 py-4 bg-red-50 text-red-600 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm group">
               <RotateCcw size={16} className="group-hover:-rotate-90 transition-transform" /> Back to App
             </button>
-            <button onClick={requestClose} className="p-4 bg-slate-200 hover:bg-red-600 hover:text-white rounded-full transition-all text-slate-500">
+            <button onClick={requestClose} aria-label="إغلاق لوحة الإدارة" className="p-3 md:p-4 bg-slate-200 hover:bg-red-600 hover:text-white rounded-full transition-all text-slate-500">
               <X size={20} />
             </button>
           </div>
@@ -493,17 +511,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
         </div>}
         {actionError && <div role="alert" className="px-10 py-3 bg-red-50 text-red-700" dir="rtl">{actionError}<button onClick={() => setActionError('')} className="mr-4 underline">إغلاق</button></div>}
         <div className="flex-1 overflow-hidden flex flex-col bg-white">
-          <div className="flex-1 overflow-y-auto no-scrollbar p-12 bg-slate-50/50">
+          <div ref={ordersScrollRef} className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-8 bg-slate-50/50">
 
 
             {activeTab === 'orders' && (
-              <div className="space-y-10 animate-reveal pb-20">
-                <div className="flex items-center justify-between bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm">
+              <div className="space-y-6 animate-reveal pb-10">
+                <div className="flex flex-wrap gap-2" role="tablist" aria-label="عرض الطلبات" dir="rtl" onKeyDown={event => {
+                  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                  event.preventDefault();
+                  const next = event.key === 'Home' ? 'tracking' : event.key === 'End' ? 'reports' : ordersView === 'tracking' ? 'reports' : 'tracking';
+                  setOrdersView(next); document.getElementById(`orders-${next}-tab`)?.focus();
+                }}>
+                  <button role="tab" id="orders-tracking-tab" tabIndex={ordersView === 'tracking' ? 0 : -1} aria-controls="orders-tracking-panel" aria-selected={ordersView === 'tracking'} onClick={() => setOrdersView('tracking')} className={`admin-order-view-tab ${ordersView === 'tracking' ? 'admin-order-view-tab--active' : ''}`}><ListOrdered size={18} /> متابعة الطلبات</button>
+                  <button role="tab" id="orders-reports-tab" tabIndex={ordersView === 'reports' ? 0 : -1} aria-controls="orders-reports-panel" aria-selected={ordersView === 'reports'} onClick={() => setOrdersView('reports')} className={`admin-order-view-tab ${ordersView === 'reports' ? 'admin-order-view-tab--active' : ''}`}><BarChart3 size={18} /> التقارير</button>
+                </div>
+                {ordersView === 'reports' ? <div role="tabpanel" id="orders-reports-panel" aria-labelledby="orders-reports-tab" className="space-y-6">
+                <div className="flex flex-wrap gap-5 items-center justify-between bg-white p-5 md:p-8 rounded-3xl border border-slate-100 shadow-sm">
                   <div>
                     <h3 className="text-3xl font-black brand-font uppercase text-slate-900">Order Analytics</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Viewing {filterType === 'day' ? 'Daily' : filterType === 'month' ? 'Monthly' : 'Yearly'} statistics · history includes all dates</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Viewing {filterType === 'day' ? 'Daily' : filterType === 'month' ? 'Monthly' : 'Yearly'} statistics · UTC calendar · excludes cancelled orders</p>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-4">
                     <div className="flex bg-slate-100 p-1.5 rounded-xl">
                       <button onClick={() => setFilterType('day')} className={`px-4 py-2 rounded-lg text-[10px] font-black transition-all ${filterType === 'day' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400'}`}>DAILY</button>
                       <button onClick={() => setFilterType('month')} className={`px-4 py-2 rounded-lg text-[10px] font-black transition-all ${filterType === 'month' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400'}`}>MONTHLY</button>
@@ -567,11 +595,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                    <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Total Revenue</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Order Value</span>
                       <h4 className="text-3xl font-black text-slate-900 leading-none">{stats.totalRevenue} <span className="text-sm">LE</span></h4>
                    </div>
                    <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Total Orders</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Orders (excl. cancelled)</span>
                       <h4 className="text-3xl font-black text-slate-900 leading-none">{stats.totalOrders}</h4>
                    </div>
                    <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
@@ -612,142 +640,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, onSign
 
                 </>}
 
-                <div className="pt-10 border-t border-slate-100">
-                   <h3 className="text-2xl font-black brand-font uppercase text-slate-900 mb-4">Recent Orders History</h3>
-                   <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-                     <p className="text-sm text-slate-500">All dates and statuses · {ordersReady ? pageResult!.total : '…'} orders</p>
-                     <div className="flex items-center gap-4">
-                       <button className="px-4 py-2 rounded-xl bg-white border disabled:opacity-40" disabled={ordersPage === 0 || ordersLoading} onClick={() => setOrdersPage(value => Math.max(0, value - 1))}>Previous</button>
-                       <span>Page {ordersPage + 1} / {pageResult ? Math.max(1, Math.ceil(pageResult.total / ORDER_PAGE_SIZE)) : '…'}</span>
-                       <button className="px-4 py-2 rounded-xl bg-white border disabled:opacity-40" disabled={!ordersReady || (ordersPage + 1) * ORDER_PAGE_SIZE >= (pageResult?.total || 0)} onClick={() => setOrdersPage(value => value + 1)}>Next</button>
-                     </div>
-                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6">
-                  {!ordersReady ? <div role={ordersError ? 'alert' : 'status'} className="p-8 bg-white rounded-3xl text-slate-600">
-                    {ordersError || 'جاري تحميل صفحة الطلبات…'}
-                    {ordersError && <button className="mr-4 underline" onClick={() => setOrdersRefresh(value => value + 1)}>إعادة المحاولة</button>}
-                  </div> : orders.length === 0 ? (
-                    <div className="bg-white p-20 rounded-[3.5rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-slate-300 italic">
-                      No orders recorded yet.
-                    </div>
-                  ) : (
-                    orders?.map(order => (
-                      <div key={order.id} className="bg-white p-10 rounded-[4rem] border-2 border-slate-50 shadow-sm hover:border-red-600 transition-all flex flex-col gap-8">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b pb-8">
-                          <div className="flex items-center gap-6">
-                            <div className="w-16 h-16 bg-slate-900 text-white rounded-3xl flex items-center justify-center font-black brand-font text-lg shadow-xl shrink-0">
-                              {order.id.slice(-2)}
-                            </div>
-                            <div>
-                              <h4 className="font-black text-2xl text-slate-900 tracking-tight leading-none mb-2 capitalize">{order.customerName}</h4>
-                              <div className="flex items-center gap-4">
-                                <span className="text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50 px-3 py-1 rounded-full">{order.id}</span>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(order.createdAt).toLocaleString()}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex gap-4 items-center">
-                            <div className="text-right">
-                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Total Price</span>
-                              <span className="text-2xl font-black text-slate-900">{order.totalPrice} LE</span>
-                            </div>
-                            <div className={`p-4 rounded-2xl flex items-center gap-3 border-2 ${order.status === 'pending' ? 'bg-orange-50 border-orange-100 text-orange-600' :
-                              order.status === 'completed' ? 'bg-green-50 border-green-100 text-green-600' :
-                                'bg-slate-50 border-slate-100 text-slate-400'
-                              }`}>
-                              <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${order.status === 'pending' ? 'bg-orange-600' : order.status === 'completed' ? 'bg-green-600' : 'bg-slate-400'
-                                }`} />
-                              <span className="text-[10px] font-black uppercase tracking-widest font-arabic">{order.status === 'pending' ? 'قيد التنفيذ' : order.status === 'completed' ? 'تم التوصيل' : 'ملغي'}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                          <div className="space-y-6">
-                            <div className="space-y-4">
-                              <h5 className="text-[11px] font-black text-slate-300 uppercase tracking-[0.3em] flex items-center gap-3">
-                                <Truck size={14} className="text-red-600" /> Delivery Details
-                              </h5>
-                              <div className="space-y-3">
-                                <div className="flex items-center gap-4 text-slate-900 font-bold">
-                                  <Phone size={16} className="text-slate-300" /> {order.phone}
-                                </div>
-                                <div className="flex items-start gap-4 text-slate-500 font-medium text-sm leading-relaxed">
-                                  <MapPin size={16} className="text-slate-300 mt-1 shrink-0" /> {order.address} ({order.area})
-                                </div>
-                                {order.location && typeof order.location === 'object' && 'lat' in order.location && (
-                                  <a
-                                    href={`https://www.google.com/maps?q=${order.location.lat},${order.location.lng}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="flex items-center gap-3 text-[10px] font-black text-red-600 uppercase tracking-widest hover:underline pt-2"
-                                  >
-                                    <Navigation size={14} fill="currentColor" /> View Exact Pin on Maps
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="space-y-4">
-                            <h5 className="text-[11px] font-black text-slate-300 uppercase tracking-[0.3em] flex items-center gap-3">
-                              <Layout size={14} className="text-red-600" /> Order Summary
-                            </h5>
-                            <div className="text-sm font-bold text-slate-600">
-                              {order.serviceType}{order.scheduledTime && ` · Scheduled: ${order.scheduledTime}`}
-                            </div>
-                            <div className="bg-slate-50 rounded-3xl p-6 space-y-4">
-                              {order.items?.map((item, idx) => (
-                                <div key={idx} className="flex justify-between items-center text-sm">
-                                  <div className="flex items-center gap-3">
-                                    <span className="w-7 h-7 bg-white rounded-lg flex items-center justify-center font-black text-[10px] border border-slate-100">{item.quantity}x</span>
-                                    <span className="font-bold text-slate-900">{item.name}</span>
-                                    {item.selectedSize && <span className="text-xs text-slate-500">{item.selectedSize.nameEn || item.selectedSize.nameAr}</span>}
-                                    {item.selectedModifiers?.map(modifier => <span key={modifier.id} className="text-xs text-slate-500">+ {modifier.nameEn || modifier.nameAr}</span>)}
-                                    {item.selectedSpiciness && (
-                                      <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase border ${item.selectedSpiciness === 'Spicy' ? 'border-red-200 text-red-600 bg-red-50' : 'border-slate-200 text-slate-400 bg-white'}`}>
-                                        {item.selectedSpiciness}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="font-black text-slate-400">{item.price * item.quantity} LE</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-4 pt-4 border-t border-slate-50">
-                          <button onClick={async () => {
-                            setActionError('');
-                            try {
-                            const { error } = await supabase.from('orders').update({ status: 'completed' }).eq('id', order.id);
-                            if (error) throw error;
-                            if (!error) {
-                              setOrdersRefresh(value => value + 1);
-                              setOrders(prev => prev?.map(o => o.id === order.id ? { ...o, status: 'completed' as const } : o));
-                            }
-                            } catch { setActionError('تعذر تغيير حالة الطلب. حاول مرة أخرى.'); }
-                          }} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-green-600 transition-all active:scale-95 shadow-lg">Mark as Completed</button>
-
-                          <button onClick={async () => {
-                            setActionError('');
-                            try {
-                            const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id);
-                            if (error) throw error;
-                            if (!error) {
-                              setOrdersRefresh(value => value + 1);
-                              setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'cancelled' as const } : o));
-                            }
-                            } catch { setActionError('تعذر تغيير حالة الطلب. حاول مرة أخرى.'); }
-                          }} className="py-4 px-8 bg-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-50 hover:text-red-600 transition-all active:scale-95">Cancel</button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                </div> : <div role="tabpanel" id="orders-tracking-panel" aria-labelledby="orders-tracking-tab">
+                <section dir="rtl" className="space-y-5" aria-labelledby="order-tracking-title">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div><h3 id="order-tracking-title" className="text-2xl font-bold text-slate-900">متابعة الطلبات</h3><p className="text-sm text-slate-600 mt-2">الأحدث أولًا · الفلاتر تخص قائمة الطلبات فقط، والتقارير لها فترة مستقلة.</p></div>
+                    <button className="admin-order-action" onClick={() => setOrdersRefresh(value => value + 1)} disabled={ordersLoading}><RotateCcw size={16} /> تحديث</button>
+                  </div>
+                  <button type="button" aria-expanded={filtersExpanded} aria-controls="order-filters-form" className="admin-order-action admin-order-mobile-filters" onClick={() => setFiltersExpanded(value => !value)}><Search size={16} /> {filtersExpanded ? 'إخفاء البحث والفلاتر' : 'بحث وتصفية الطلبات'}</button>
+                  <form id="order-filters-form" className={`admin-order-filters ${filtersExpanded ? '' : 'admin-order-filters--collapsed'}`} onSubmit={event => { event.preventDefault(); setOrdersPage(0); setOrderFilters({ ...filterDraft }); setOrdersRefresh(value => value + 1); }}>
+                    <label className="admin-order-filter admin-order-filter--search">بحث برقم الطلب أو الموبايل أو الاسم<input type="search" maxLength={100} value={filterDraft.search} onChange={event => setFilterDraft({ ...filterDraft, search: event.target.value })} placeholder="ابحث في كل الطلبات…" /></label>
+                    <label className="admin-order-filter">الحالة<select value={filterDraft.status} onChange={event => setFilterDraft({ ...filterDraft, status: event.target.value as OrderFilters['status'] })}><option value="">كل الحالات</option><option value="pending">قيد التنفيذ</option><option value="completed">مكتمل</option><option value="cancelled">ملغي</option></select></label>
+                    <label className="admin-order-filter">المنطقة<input list="order-area-options" maxLength={100} value={filterDraft.area} onChange={event => setFilterDraft({ ...filterDraft, area: event.target.value })} placeholder="كل المناطق" /><datalist id="order-area-options">{Array.from(new Set(config.areas.flatMap(area => [area.nameAr, area.nameEn]).filter(Boolean))).map(name => <option key={name} value={name} />)}</datalist></label>
+                    <label className="admin-order-filter">من تاريخ<input type="date" value={filterDraft.from} max={filterDraft.until || undefined} onChange={event => setFilterDraft({ ...filterDraft, from: event.target.value })} /></label>
+                    <label className="admin-order-filter">إلى تاريخ<input type="date" value={filterDraft.until} min={filterDraft.from || undefined} onChange={event => setFilterDraft({ ...filterDraft, until: event.target.value })} /></label>
+                    <div className="flex flex-wrap items-end gap-2"><button type="submit" className="admin-order-action admin-order-action--complete"><Search size={16} /> تطبيق</button><button type="button" className="admin-order-action" onClick={() => { setFilterDraft({ ...EMPTY_ORDER_FILTERS }); setOrderFilters({ ...EMPTY_ORDER_FILTERS }); setOrdersPage(0); }}>مسح الفلاتر</button></div>
+                    <p className="text-xs text-slate-600 col-span-full">التاريخ والوقت بتوقيت القاهرة، من بداية اليوم إلى نهايته. اضغط «تطبيق» لعرض النتائج.</p>
+                  </form>
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <p role="status" className="text-sm text-slate-600">{ordersReady ? `${pageResult!.total} طلب مطابق · عرض ${orders.length ? ordersPage * ORDER_PAGE_SIZE + 1 : 0}–${ordersPage * ORDER_PAGE_SIZE + orders.length}` : 'جاري تحميل النتائج…'}{Object.values(orderFilters).some(Boolean) && ' · فلاتر مطبّقة'}</p>
+                    <nav aria-label="صفحات الطلبات" className="flex items-center gap-3 text-sm"><button className="admin-order-action" disabled={ordersPage === 0 || !ordersReady} onClick={() => setOrdersPage(value => Math.max(0, value - 1))}>السابق</button><span>صفحة {ordersPage + 1} / {ordersReady ? Math.max(1, Math.ceil(pageResult!.total / ORDER_PAGE_SIZE)) : '…'}</span><button className="admin-order-action" disabled={!ordersReady || (ordersPage + 1) * ORDER_PAGE_SIZE >= (pageResult?.total || 0)} onClick={() => setOrdersPage(value => value + 1)}>التالي</button></nav>
+                  </div>
+                  {!ordersReady ? <div role={ordersError ? 'alert' : 'status'} className="p-6 bg-white rounded-2xl text-slate-700">{ordersError || 'جاري تحميل صفحة الطلبات…'}{ordersError && <button className="mr-4 underline" onClick={() => setOrdersRefresh(value => value + 1)}>إعادة المحاولة</button>}</div> : orders.length === 0 ? <div className="p-10 bg-white rounded-2xl text-center text-slate-600">لا توجد طلبات مطابقة للفلاتر الحالية.</div> : <div className="space-y-3">{orders.map(order => <AdminOrderCard key={order.id} order={order} onStatus={updateOrderStatus} />)}</div>}
+                </section>
+                </div>}
               </div>
             )}
             {activeTab === 'menu' && (
