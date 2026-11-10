@@ -1,11 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { orderDateRange, fetchOrdersPage, fetchOrderStats, exportOrdersCsv, csvCell } from '../lib/adminOrders.ts';
+import { orderDateRange, fetchOrdersPage, fetchOrderStats, exportOrdersCsv, csvCell, cairoDateBoundary, EMPTY_ORDER_FILTERS, orderSearchText } from '../lib/adminOrders.ts';
 
 const builder=(result,calls=[])=>({
  select(...args){calls.push(['select',...args]);return this;},
  order(...args){calls.push(['order',...args]);return this;},
  range(...args){calls.push(['range',...args]);return this;},
+ or(...args){calls.push(['or',...args]);return this;},
+ eq(...args){calls.push(['eq',...args]);return this;},
+ ilike(...args){calls.push(['ilike',...args]);return this;},
+ gte(...args){calls.push(['gte',...args]);return this;},
+ lt(...args){calls.push(['lt',...args]);return this;},
  abortSignal(signal){calls.push(['signal',signal]);return this;},
  then(resolve,reject){return Promise.resolve(typeof result==='function'?result():result).then(resolve,reject);}
 });
@@ -26,6 +31,38 @@ test('a history page fetches 25 rows with exact total and deterministic timestam
  assert.deepEqual(calls.filter(call=>call[0]==='order').map(call=>call.slice(1)),[['created_at',{ascending:false}],['id',{ascending:false}]]);
  assert.equal(calls.find(call=>call[0]==='select')[2].count,'exact');
  assert.ok(calls.find(call=>call[0]==='signal'));
+});
+test('filters execute on the server before pagination, with a filtered exact total', async () => {
+ const calls=[];
+ const client={from(){return builder({data:[row(2000)],count:1,error:null},calls);}};
+ const filters={search:'٠١٠٠٠٠٠٠٠٠٠',status:'pending',area:'النخيل',from:'2026-11-01',until:'2026-11-10'};
+ const result=await fetchOrdersPage(client,0,undefined,filters);
+ assert.equal(result.total,1);
+ assert.deepEqual(calls.find(c=>c[0]==='or'),['or','id.ilike.%01000000000%,customer_name.ilike.%01000000000%,phone.ilike.%01000000000%']);
+ assert.deepEqual(calls.find(c=>c[0]==='eq'),['eq','status','pending']);
+ assert.deepEqual(calls.find(c=>c[0]==='ilike'),['ilike','area','%النخيل%']);
+ assert.deepEqual(calls.find(c=>c[0]==='gte'),['gte','created_at','2026-10-31T22:00:00.000Z']);
+ assert.deepEqual(calls.find(c=>c[0]==='lt'),['lt','created_at','2026-11-10T22:00:00.000Z']);
+ assert.ok(calls.findIndex(c=>c[0]==='or') < calls.findIndex(c=>c[0]==='range'));
+});
+test('Cairo date filters account for summer time and reject invalid date ranges', async () => {
+ assert.equal(cairoDateBoundary('2026-07-01'),'2026-06-30T21:00:00.000Z');
+ assert.equal(cairoDateBoundary('2026-11-10',true),'2026-11-10T22:00:00.000Z');
+ assert.throws(()=>cairoDateBoundary('2026-02-30'));
+ await assert.rejects(fetchOrdersPage({},0,undefined,{...EMPTY_ORDER_FILTERS,from:'2026-11-12',until:'2026-11-01'}));
+});
+test('search text cannot insert PostgREST expressions or wildcards', async () => {
+ const cleaned=orderSearchText('x),status.eq.completed,customer_name.ilike.*');
+ assert.ok(!/[(),.*%]/.test(cleaned));
+ assert.equal(orderSearchText('محمد أحمد'),'محمد أحمد');
+ assert.equal(orderSearchText('CH-EF123456'),'CH-EF123456');
+ await assert.rejects(fetchOrdersPage({from(){return builder({data:[],count:0});}},0,undefined,{...EMPTY_ORDER_FILTERS,search:'*%()'}));
+});
+test('a displayed short order number searches the persisted ID suffix', async () => {
+ const calls=[];
+ const client={from(){return builder({data:[],count:0,error:null},calls);}};
+ await fetchOrdersPage(client,0,undefined,{...EMPTY_ORDER_FILTERS,search:'CH-EF123456'});
+ assert.equal(calls.find(c=>c[0]==='or')[1],'id.ilike.%EF123456%,customer_name.ilike.%CH-EF123456%,phone.ilike.%CH-EF123456%');
 });
 test('full-period statistics come from their own aggregate request, never the history page',async()=>{
  const expected={totalOrders:2200,totalRevenue:22000,areaStats:{Test:{count:2200,revenue:22000}},topArea:['Test',{count:2200,revenue:22000}],topItem:['Meal',4400]};

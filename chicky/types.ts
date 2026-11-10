@@ -164,4 +164,5 @@ export interface StoredOrder {
   createdAt: string;
   serviceType: ServiceType;
   scheduledTime?: string;
+  paymentMethod?: string;
 }
