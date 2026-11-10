@@ -24,6 +24,27 @@ test('money breakdown preserves persisted total and never calls the net adjustme
   assert.deepEqual(orderMoney({ ...order, totalPrice: 170 }), { subtotal: 200, adjustment: -30 });
   assert.match(orderReceiptHtml(order), /غير محفوظين بشكل منفصل/);
 });
+test('new receipts show persisted delivery and discount separately, including zero amounts', () => {
+  const saved = { ...order, totalPrice: 210, pricing: { version: 1, subtotal: 200, delivery_fee: 30, discount_amount: 20 } };
+  assert.deepEqual(orderMoney(saved), { subtotal: 200, adjustment: 10, breakdown: { deliveryFee: 30, discountAmount: 20 } });
+  const html = orderReceiptHtml(saved);
+  assert.match(html, /التوصيل: 30 ج.م/); assert.match(html, /الخصم: 20 ج.م/);
+  assert.ok(!html.includes('غير محفوظين بشكل منفصل'));
+  assert.deepEqual(orderMoney({ ...saved, totalPrice: 200, pricing: { version: 1, subtotal: 200, delivery_fee: 0, discount_amount: 0 } }).breakdown, { deliveryFee: 0, discountAmount: 0 });
+  assert.equal(saved.totalPrice, 210);
+});
+test('invalid, incomplete or inconsistent historical monetary snapshots remain explicitly unitemized', () => {
+  const valid = { version: 1, subtotal: 200, delivery_fee: 55, discount_amount: 20 };
+  for (const pricing of [null, {}, { ...valid, version: 2 }, { ...valid, subtotal: 201 }, { ...valid, delivery_fee: -1 }, { ...valid, discount_amount: '20' }, { ...valid, discount_amount: null }, { ...valid, delivery_fee: Infinity }, { ...valid, discount_amount: 0 }]) {
+    assert.deepEqual(orderMoney({ ...order, pricing }), { subtotal: 200, adjustment: 35 });
+    assert.match(orderReceiptHtml({ ...order, pricing }), /غير محفوظين بشكل منفصل/);
+  }
+});
+test('decimal snapshots allow the existing server total tolerance without recalculating the payable amount', () => {
+  const saved = { ...order, items: [{name:'وجبة',price:99.95,quantity:2}], totalPrice: 209.91, pricing: { version:1,subtotal:199.9,delivery_fee:30,discount_amount:19.99 } };
+  assert.deepEqual(orderMoney(saved).breakdown, { deliveryFee:30,discountAmount:19.99 });
+  assert.match(orderReceiptHtml(saved), /209.91 ج.م/);
+});
 test('print receipt escapes all customer and catalog text, including attribute-breaking input', () => {
   const malicious = '<img src=x onerror="alert(1)"><script>alert(1)</script>';
   const html = orderReceiptHtml({ ...order, customerName: malicious, address: malicious, area: malicious, phone: malicious, scheduledTime: malicious, items: [{ ...order.items[0], name: malicious, selectedModifiers: [{ id: 'a', nameEn: malicious }] }] });

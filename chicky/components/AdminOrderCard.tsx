@@ -63,8 +63,10 @@ export default function AdminOrderCard({ order, onStatus }: { key?: string; orde
           </ul>
           <dl className="text-sm space-y-2 mt-4">
             <div className="flex justify-between gap-3"><dt>قيمة الأصناف</dt><dd>{money.subtotal} ج.م</dd></div>
-            <div className="flex justify-between gap-3"><dt>صافي التوصيل / الخصم</dt><dd>{money.adjustment} ج.م</dd></div>
-            <p className="text-xs text-slate-500">التوصيل والخصم غير محفوظين بشكل منفصل في هذا الطلب.</p>
+            {money.breakdown ? <>
+              <div className="flex justify-between gap-3"><dt>التوصيل</dt><dd>{money.breakdown.deliveryFee} ج.م</dd></div>
+              <div className="flex justify-between gap-3"><dt>الخصم</dt><dd>{money.breakdown.discountAmount} ج.م</dd></div>
+            </> : <div><div className="flex justify-between gap-3"><dt>صافي التوصيل / الخصم</dt><dd>{money.adjustment} ج.م</dd></div><p className="text-xs text-slate-500 mt-2">التوصيل والخصم غير محفوظين بشكل منفصل في هذا الطلب.</p></div>}
             <div className="flex justify-between gap-3 font-bold"><dt>الإجمالي</dt><dd>{order.totalPrice} ج.م</dd></div>
           </dl>
         </section>

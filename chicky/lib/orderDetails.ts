@@ -26,6 +26,7 @@ export function mapStoredOrder(row: any): StoredOrder {
     totalPrice: row.total_price, status: row.status, createdAt: row.created_at,
     serviceType: row.order_details?.service_type ?? row.service_type,
     scheduledTime: row.order_details?.scheduled_time ?? row.scheduled_time,
-    paymentMethod: row.payment_method ?? undefined
+    paymentMethod: row.payment_method ?? undefined,
+    pricing: row.order_details?.pricing ?? undefined
   };
 }

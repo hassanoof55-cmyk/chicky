@@ -165,4 +165,5 @@ export interface StoredOrder {
   serviceType: ServiceType;
   scheduledTime?: string;
   paymentMethod?: string;
+  pricing?: { version: number; subtotal: number; delivery_fee: number; discount_amount: number };
 }
